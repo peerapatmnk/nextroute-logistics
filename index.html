@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NextRoute Logistics - เว็บแอปพลิเคชันจัดการและติดตามรอบรถ</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Leaflet Map CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased flex h-screen overflow-hidden">
+
+  <!-- =====================================================================
+       SIDEBAR NAVIGATION
+  ===================================================================== -->
+  <aside class="w-64 bg-slate-900 text-slate-300 flex flex-col shrink-0 border-r border-slate-800 select-none z-20">
+    <!-- Brand Header -->
+    <div class="p-5 border-b border-slate-800 flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-700 to-indigo-500 flex items-center justify-center text-white shadow-lg">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+      </div>
+      <div>
+        <div class="font-bold text-white text-base tracking-wide flex items-center gap-1.5">
+          <span>NextRoute</span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-900 text-blue-300 font-mono">v1.0</span>
+        </div>
+        <div class="text-[11px] text-slate-400">Logistics Management</div>
+      </div>
+    </div>
+
+    <!-- Company Badge -->
+    <div class="px-4 py-2.5 bg-slate-800/60 mx-3 my-3 rounded-xl border border-slate-700/50">
+      <div class="text-[10px] uppercase font-bold text-slate-400">กรณีศึกษา</div>
+      <div class="text-xs font-semibold text-slate-200 truncate">บจก. เน็คท์รูท โลจิสติกส์</div>
+      <div class="text-[10px] text-emerald-400 flex items-center gap-1 mt-0.5">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span>รถประจำการ <span data-kpi="total-vehicles">13</span> คัน</span>
+      </div>
+    </div>
+
+    <!-- Nav Items -->
+    <nav class="flex-1 px-3 space-y-1 overflow-y-auto">
+      <button data-nav-tab="dashboard" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition bg-blue-600 text-white shadow-sm">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        <span>หน้าหลัก (Dashboard)</span>
+      </button>
+
+      <button data-nav-tab="status-tracking" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition">
+        <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span>ติดตามสถานะงาน (Status Flow)</span>
+      </button>
+
+      <button data-nav-tab="gps-tracking" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition">
+        <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        <span>ติดตามรถด้วย GPS</span>
+      </button>
+
+      <button data-nav-tab="routes-tasks" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition">
+        <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        <span>จัดรอบรถและมอบหมายงาน</span>
+      </button>
+
+      <button data-nav-tab="fleet-management" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition">
+        <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h8m0 0l3 5m-3-5v8m-8 0V7m0 8h8m-8 0H5a2 2 0 01-2-2V7a2 2 0 012-2h3m8 8h2a2 2 0 002-2v-3.5L16 7M5 19a2 2 0 100-4 2 2 0 000 4zm12 0a2 2 0 100-4 2 2 0 000 4z"/></svg>
+        <span>จัดการรถและคนขับ (<span data-kpi="total-vehicles">13</span>/<span data-kpi="total-drivers">13</span>)</span>
+      </button>
+
+      <button data-nav-tab="history-reports" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition">
+        <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span>ประวัติงานและรายงาน</span>
+      </button>
+
+      <div class="pt-3 pb-1">
+        <div class="px-3 text-[10px] uppercase font-bold text-slate-500 tracking-wider">โหมดจำลองระบบ</div>
+      </div>
+
+      <button data-nav-tab="driver-view" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-emerald-300 bg-emerald-950/40 border border-emerald-800/40 hover:bg-emerald-900/60 transition">
+        <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+        <span>📱 จำลองหน้าจอมือถือคนขับ</span>
+      </button>
+    </nav>
+
+    <!-- Footer Controls -->
+    <div class="p-3 border-t border-slate-800 space-y-2">
+      <button id="btn-reset-data" class="w-full py-2 px-3 text-[11px] font-semibold text-slate-400 hover:text-rose-300 hover:bg-rose-950/40 rounded-lg transition text-left flex items-center gap-2">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        <span>รีเซ็ตข้อมูลเริ่มต้น (จากสไลด์)</span>
+      </button>
+      <div class="text-[10px] text-slate-500 text-center">NextRoute Logistics &copy; 2026</div>
+    </div>
+  </aside>
+
+  <!-- =====================================================================
+       MAIN WORKSPACE
+  ===================================================================== -->
+  <main class="flex-1 flex flex-col min-w-0 bg-slate-50 overflow-hidden">
+    <!-- Top Bar Header -->
+    <header class="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 z-10">
+      <div class="flex items-center gap-4">
+        <h1 class="text-lg font-bold text-slate-800">ระบบบริหารจัดการและติดตามรอบรถขนส่ง</h1>
+        <div class="hidden sm:flex items-center gap-2 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-full text-xs text-emerald-700 font-medium">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>GPS Live Tracking เชื่อมต่อแล้ว</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4">
+        <!-- Live Clock & Date -->
+        <div class="hidden md:flex flex-col text-right">
+          <span id="header-live-time" class="text-xs font-bold font-mono text-slate-800">--:--:--</span>
+          <span class="text-[10px] text-slate-400">เวลามาตรฐานประเทศไทย (ICT)</span>
+        </div>
+        <!-- Admin Profile Tag -->
+        <div class="flex items-center gap-2.5 pl-3 border-l border-slate-200">
+          <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-xs ring-2 ring-blue-50">
+            AD
+          </div>
+          <div class="hidden sm:block text-left">
+            <div class="text-xs font-bold text-slate-800 leading-tight">ผู้ดูแลระบบ (Admin)</div>
+            <div class="text-[10px] text-slate-400">ศูนย์ควบคุม NextRoute</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Scrollable Content Area -->
+    <div class="flex-1 overflow-y-auto p-6">
+
+      <!-- ===============================================================
+           TAB 1: DASHBOARD
+      =============================================================== -->
+      <div id="pane-dashboard" class="tab-pane space-y-6">
+        <!-- KPI Summary Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          <div class="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm">
+            <div class="text-xs font-semibold text-slate-500">รถบรรทุกทั้งหมด</div>
+            <div class="text-2xl font-black text-slate-900 mt-1 font-mono" data-kpi="total-vehicles">13</div>
+            <div class="text-[11px] text-slate-400 mt-0.5" data-kpi="brand-summary">Volvo 5 | Scania 8</div>
+          </div>
+          <div class="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm">
+            <div class="text-xs font-semibold text-emerald-600 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+              <span>กำลังวิ่งส่งสินค้า</span>
+            </div>
+            <div class="text-2xl font-black text-emerald-600 mt-1 font-mono" data-kpi="running-vehicles">10</div>
+            <div class="text-[11px] text-slate-400 mt-0.5">ความเร็วเฉลี่ย 72 กม./ชม.</div>
+          </div>
+          <div class="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm">
+            <div class="text-xs font-semibold text-amber-600 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+              <span>จอดพักรถ (ตามกฎ 4 ชม.)</span>
+            </div>
+            <div class="text-2xl font-black text-amber-600 mt-1 font-mono" data-kpi="resting-vehicles">2</div>
+            <div class="text-[11px] text-slate-400 mt-0.5">พักรถ 30 นาที</div>
+          </div>
+          <div class="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm">
+            <div class="text-xs font-semibold text-blue-600 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+              <span>พร้อมรับงาน</span>
+            </div>
+            <div class="text-2xl font-black text-blue-600 mt-1 font-mono" data-kpi="idle-vehicles">1</div>
+            <div class="text-[11px] text-slate-400 mt-0.5">อยู่ที่สำนักงานใหญ่</div>
+          </div>
+          <div class="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm col-span-2 sm:col-span-1">
+            <div class="text-xs font-semibold text-purple-600">งานที่กำลังดำเนินงาน</div>
+            <div class="text-2xl font-black text-purple-600 mt-1 font-mono" data-kpi="active-jobs">5</div>
+            <div class="text-[11px] text-slate-400 mt-0.5">เสร็จสิ้นวันนี้: <span data-kpi="completed-jobs">1</span> งาน</div>
+          </div>
+        </div>
+
+        <!-- Live Map & Status Side by Side -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Interactive Map Container -->
+          <div class="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="text-sm font-bold text-slate-800">แผนที่ติดตามตำแหน่งรถแบบเรียลไทม์ (Live Fleet GPS)</h3>
+                <p class="text-xs text-slate-500">แสดงพิกัดรถขนส่ง <span data-kpi="total-vehicles">13</span> คัน และคลังสินค้าภาคตะวันออก-กรุงเทพฯ</p>
+              </div>
+              <button onclick="App.switchTab('gps-tracking')" class="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                <span>ขยายเต็มจอ</span> &rarr;
+              </button>
+            </div>
+            <div id="dashboard-map" class="w-full h-96 rounded-xl border border-slate-100 z-0"></div>
+          </div>
+
+          <!-- Quick Status Card -->
+          <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-bold text-slate-800">งานขนส่งล่าสุด</h3>
+              <button onclick="App.switchTab('status-tracking')" class="text-xs font-bold text-blue-600 hover:text-blue-800">ดูทั้งหมด &rarr;</button>
+            </div>
+            <div class="space-y-2.5 overflow-y-auto max-h-96 pr-1">
+              <div class="p-3 bg-slate-50 border border-slate-100 rounded-xl">
+                <div class="flex justify-between items-center text-xs">
+                  <span class="font-bold text-blue-700 font-mono">JN-001</span>
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700">ออกเดินทาง</span>
+                </div>
+                <div class="text-xs font-semibold text-slate-800 mt-1">ชลบุรี -> ระยอง (น้ำมันดีเซล B7)</div>
+                <div class="text-[11px] text-slate-500 mt-0.5">ชบ.73-8910 | คนขับ: นายสมชาย ใจดี</div>
+              </div>
+              <div class="p-3 bg-slate-50 border border-slate-100 rounded-xl">
+                <div class="flex justify-between items-center text-xs">
+                  <span class="font-bold text-blue-700 font-mono">JN-002</span>
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">รับสินค้า</span>
+                </div>
+                <div class="text-xs font-semibold text-slate-800 mt-1">ระยอง -> ฉะเชิงเทรา (ก๊าซ LPG)</div>
+                <div class="text-[11px] text-slate-500 mt-0.5">ชบ.73-8911 | คนขับ: นายธีรพงษ์ ศรีนา</div>
+              </div>
+              <div class="p-3 bg-slate-50 border border-slate-100 rounded-xl">
+                <div class="flex justify-between items-center text-xs">
+                  <span class="font-bold text-blue-700 font-mono">JN-007</span>
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700">ออกเดินทาง (ระยะไกล)</span>
+                </div>
+                <div class="text-xs font-semibold text-slate-800 mt-1">มาบตาพุด -> ขอนแก่น (460 กม.)</div>
+                <div class="text-[11px] text-slate-500 mt-0.5">ชบ.73-8916 | คนขับ: นายพิชัย มงคลดี (พักรถ 30 นาที)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Jobs Table -->
+        <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+            <h3 class="text-sm font-bold text-slate-800">ตารางสถานะรอบรถที่กำลังดำเนินงาน (Active Route Operations)</h3>
+            <span class="text-xs text-slate-400">อัปเดตอัตโนมัติจาก GPS และ Mobile Driver</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
+                  <th class="py-3 px-4">เลขงาน</th>
+                  <th class="py-3 px-4">ลูกค้า</th>
+                  <th class="py-3 px-4">เส้นทาง / สินค้า</th>
+                  <th class="py-3 px-4">ทะเบียนรถ</th>
+                  <th class="py-3 px-4">คนขับ</th>
+                  <th class="py-3 px-4">สถานะปัจจุบัน</th>
+                  <th class="py-3 px-4 text-right">ดำเนินการ</th>
+                </tr>
+              </thead>
+              <tbody id="dashboard-jobs-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===============================================================
+           TAB 2: STATUS TRACKING (ฟังก์ชันหลักตามสไลด์ 6 & 7)
+      =============================================================== -->
+      <div id="pane-status-tracking" class="tab-pane hidden space-y-6">
+        <!-- Job Selector & Header -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs uppercase font-bold text-blue-600">Status Tracking System (FSM Engine)</span>
+              <span id="tracker-transport-badge" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-700">🇹🇭 ในประเทศ</span>
+            </div>
+            <h2 id="tracker-main-title" class="text-lg font-bold text-slate-900 mt-0.5">ระบบติดตามสถานะงานขนส่ง 7 ขั้นตอน</h2>
+          </div>
+          <div class="flex items-center gap-3">
+            <label class="text-xs font-semibold text-slate-600">เลือกใบงาน:</label>
+            <select id="select-track-job" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+          </div>
+        </div>
+
+        <!-- FSM Stepper Card -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+          <div class="flex items-center justify-between mb-6">
+            <h3 id="stepper-title" class="text-sm font-bold text-slate-800">ลำดับขั้นตอนสถานะงาน (Status Flow 7 ขั้นตอน)</h3>
+            <span class="text-xs text-slate-400 flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> อัปเดตแบบเรียลไทม์จากแอปคนขับ (Read-only Monitoring)</span>
+          </div>
+
+          <div id="fsm-stepper-container" class="stepper-container px-4 py-6">
+            <div class="stepper-line"></div>
+            <div class="stepper-line-active" style="width: 50%;"></div>
+            <div id="stepper-nodes-wrapper" class="w-full flex justify-between relative z-10"></div>
+          </div>
+
+          <div class="mt-6 pt-4 border-t border-slate-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <!-- Left: Current Operator & Driver waiting info -->
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold shrink-0 border border-blue-100 shadow-sm">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+              </div>
+              <div>
+                <div class="text-xs font-bold text-slate-800 flex items-center gap-2">
+                  <span>ผู้รับผิดชอบการอัปเดต:</span>
+                  <span id="tracker-driver-responsible" class="text-blue-700 font-bold bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-200">-</span>
+                </div>
+                <div id="tracker-waiting-action" class="text-[11px] text-slate-500 mt-0.5">
+                  รอคนขับยืนยันขั้นตอนผ่านหน้าจอ Driver Mobile App
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: Action shortcuts (Simulator + Emergency Override) -->
+            <div class="flex items-center gap-2.5 w-full md:w-auto justify-end">
+              <!-- Quick link to Driver Simulator for Demo/Testing -->
+              <button onclick="App.switchTab('driver-view')" class="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
+                <span>📱 จำลองหน้าจอมือถือคนขับ</span>
+              </button>
+
+              <!-- Option A: Discreet Emergency Admin Override -->
+              <button onclick="App.openAdminOverrideModal()" class="px-3 py-2 bg-slate-50 hover:bg-amber-50 text-slate-600 hover:text-amber-800 border border-slate-200 hover:border-amber-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition" title="ใช้เฉพาะกรณีฉุกเฉิน เช่น คนขับแบตหมดหรือไม่มีสัญญาณ">
+                <svg class="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                <span>⚠️ จัดการกรณีฉุกเฉิน (Admin Override)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Job Details & Timeline Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Job Details Summary -->
+          <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+            <h3 class="text-sm font-bold text-slate-800 border-b pb-2">รายละเอียดใบงานขนส่ง</h3>
+            <div class="text-xs space-y-2.5 text-slate-600">
+              <div class="flex justify-between"><span>รหัสงาน:</span> <strong id="track-job-code" class="text-slate-900 font-mono">-</strong></div>
+              <div class="flex justify-between"><span>ทะเบียนรถ:</span> <strong id="track-job-plate" class="text-slate-900 font-mono">-</strong></div>
+              <div class="flex justify-between"><span>พนักงานขับรถ:</span> <strong id="track-job-driver" class="text-slate-900">-</strong></div>
+              <div class="flex justify-between"><span>สินค้า/ปริมาณ:</span> <strong id="track-job-product" class="text-indigo-600 font-medium">-</strong></div>
+              <div class="flex justify-between"><span>เส้นทางขนส่ง:</span> <strong id="track-job-route" class="text-slate-900 text-right">-</strong></div>
+              <div class="flex justify-between"><span>เวลาถึงโดยประมาณ (ETA):</span> <strong id="track-job-eta" class="text-emerald-600 font-bold font-mono">-</strong></div>
+
+              <!-- Trip & Safety Rest Plan Compact Summary -->
+              <div class="pt-2.5 mt-2 border-t border-slate-100 space-y-2">
+                <div class="flex justify-between items-center">
+                  <span>ระยะทางส่ง / ไป-กลับ:</span>
+                  <strong id="track-job-distance" class="font-mono text-slate-800">-</strong>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span>พักรถ (ตามกฎ 4 ชม.):</span>
+                  <strong id="track-job-rest" class="text-amber-700 font-semibold">-</strong>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span>เวลากลับถึงบริษัท:</span>
+                  <strong id="track-job-return-eta" class="font-mono text-slate-700">-</strong>
+                </div>
+                <button id="btn-view-milestones" onclick="App.openMilestonesModal(App.selectedJobId)" class="w-full py-1.5 bg-slate-50 hover:bg-blue-50 text-blue-700 border border-slate-200 hover:border-blue-200 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1.5">
+                  <span>🗺️ ดูแผนเวลาเดินทางและจุดพักรถ (Milestones)</span>
+                </button>
+              </div>
+
+              <!-- Cross-Border Compact Info (แสดงเฉพาะงานข้ามแดน) -->
+              <div id="track-cb-row" class="hidden pt-2.5 mt-2 border-t border-slate-100 space-y-2">
+                <div class="flex justify-between items-center">
+                  <span class="text-purple-700 font-semibold">ใบอนุญาตข้ามแดน:</span>
+                  <strong id="track-job-permit" class="font-mono text-purple-700">-</strong>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-purple-700 font-semibold">ใบขน กศก.120:</span>
+                  <strong id="track-job-declaration" class="font-mono text-purple-700">-</strong>
+                </div>
+                <button onclick="App.showCustomsPermitModal()" class="w-full py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-[11px] font-bold transition">
+                  📄 ดูเอกสารขออนุญาตข้ามแดน
+                </button>
+              </div>
+            </div>
+
+            <div class="p-3 bg-blue-50 border border-blue-100 rounded-xl text-[11px] text-blue-800">
+              💡 <strong>ระบบเชื่อมโยง 3 ฝ่าย:</strong> เมื่อคนขับอัปเดตสถานะผ่านมือถือ หรือแอดมินเปลี่ยนสถานะ ลูกค้าจะสามารถติดตามความคืบหน้าได้ทันที
+            </div>
+          </div>
+
+          <!-- Activity History Timeline -->
+          <div class="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+            <h3 class="text-sm font-bold text-slate-800 border-b pb-2 mb-4">ประวัติและเวลาการเปลี่ยนสถานะ (Status Audit Trail)</h3>
+            <div id="job-timeline-list" class="space-y-1"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===============================================================
+           TAB 3: GPS TRACKING
+      =============================================================== -->
+      <div id="pane-gps-tracking" class="tab-pane hidden space-y-6">
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-140px)]">
+          <!-- Left Vehicle List -->
+          <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col h-full">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-bold text-slate-800">รายชื่อรถ (<span data-kpi="total-vehicles">13</span> คัน)</h3>
+              <span class="text-xs text-slate-400">Live GPS</span>
+            </div>
+            <div class="flex-1 overflow-y-auto pr-1" id="gps-vehicle-list"></div>
+          </div>
+
+          <!-- Right Fullscreen Map -->
+          <div class="lg:col-span-3 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col h-full">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-3">
+                <span class="text-xs font-bold text-slate-700">ตัวกรอง:</span>
+                <button onclick="App.mapManagers.gps.renderVehicles('all')" class="px-2.5 py-1 text-xs font-bold bg-slate-100 hover:bg-slate-200 rounded-lg">ทั้งหมด (<span data-kpi="total-vehicles">13</span>)</button>
+                <button onclick="App.mapManagers.gps.renderVehicles('running')" class="px-2.5 py-1 text-xs font-bold bg-emerald-100 text-emerald-800 hover:bg-emerald-200 rounded-lg">กำลังวิ่ง</button>
+                <button onclick="App.mapManagers.gps.renderVehicles('resting')" class="px-2.5 py-1 text-xs font-bold bg-amber-100 text-amber-800 hover:bg-amber-200 rounded-lg">จอดพัก</button>
+              </div>
+              <div class="text-xs text-slate-400">แผนที่ OpenStreetMap / Real-time Marker Update</div>
+            </div>
+            <div id="gps-fullscreen-map" class="flex-1 rounded-xl border border-slate-100 z-0"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===============================================================
+           TAB 4: ROUTES & TASK ASSIGNMENT (สไลด์ 10)
+      =============================================================== -->
+      <div id="pane-routes-tasks" class="tab-pane hidden space-y-6">
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex items-center justify-between">
+          <div>
+            <h2 class="text-base font-bold text-slate-900">จัดการรอบรถและมอบหมายงาน (Route & Task Assignment)</h2>
+            <p class="text-xs text-slate-500">สร้างใบงาน มอบหมายรถกับคนขับ และกำหนดรอบเวลาการขนส่ง</p>
+          </div>
+          <button onclick="App.openNewJobModal()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+            <span>+ สร้างรอบรถใหม่</span>
+          </button>
+        </div>
+
+        <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
+                  <th class="py-3 px-4">รหัสงาน</th>
+                  <th class="py-3 px-4">วันที่/เวลาออก</th>
+                  <th class="py-3 px-4">ลูกค้า</th>
+                  <th class="py-3 px-4">จุดรับ - จุดส่ง</th>
+                  <th class="py-3 px-4">ทะเบียนรถ</th>
+                  <th class="py-3 px-4">คนขับ</th>
+                  <th class="py-3 px-4">เวลาถึง (ETA)</th>
+                  <th class="py-3 px-4">สถานะงาน</th>
+                  <th class="py-3 px-4 text-right">การดำเนินการ</th>
+                </tr>
+              </thead>
+              <tbody id="routes-jobs-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===============================================================
+           TAB 6: FLEET MANAGEMENT (รถและคนขับ ตามสไลด์ 8)
+      =============================================================== -->
+      <div id="pane-fleet-management" class="tab-pane hidden space-y-6">
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-base font-bold text-slate-900 mb-0.5">
+              กองรถบรรทุกและพนักงานขับรถประจำการ (<span data-kpi="total-vehicles">13</span> คัน / <span data-kpi="total-drivers">13</span> คน)
+            </h2>
+            <p class="text-xs text-slate-500" data-kpi="fleet-brand-desc">ข้อมูลรถบรรทุก Volvo FM370 (5 คัน) และ Scania P360 (8 คัน) พร้อมทำเนียบพนักงานขับรถ</p>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button onclick="App.openNewVehicleModal()" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition">
+              <span>+ เพิ่มรถบรรทุก</span>
+            </button>
+            <button onclick="App.openNewDriverModal()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 flex items-center gap-2 transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+              <span>+ เพิ่มพนักงาน</span>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-xs font-bold uppercase text-slate-500 tracking-wider">ยานพาหนะขนส่ง (Vehicles - <span data-kpi="total-vehicles">13</span> คัน)</h3>
+            <button onclick="App.openNewVehicleModal()" class="px-3 py-1.5 bg-slate-100 hover:bg-blue-600 text-slate-700 hover:text-white border border-slate-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition">
+              <span>+ เพิ่มรถบรรทุก</span>
+            </button>
+          </div>
+          <div id="fleet-vehicle-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+        </div>
+
+        <div class="pt-4 border-t border-slate-200">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-xs font-bold uppercase text-slate-500 tracking-wider">
+              พนักงานขับรถ (Drivers - <span data-kpi="total-drivers">13</span> คน | ใบขับขี่ ท.4 วัตถุอันตราย)
+            </h3>
+            <button onclick="App.openNewDriverModal()" class="px-3 py-1.5 bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white border border-blue-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition">
+              <span>+ เพิ่มพนักงาน</span>
+            </button>
+          </div>
+          <div id="fleet-driver-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+        </div>
+      </div>
+
+      <!-- ===============================================================
+           TAB 7: HISTORY & REPORTS (สไลด์ 13)
+      =============================================================== -->
+      <div id="pane-history-reports" class="tab-pane hidden space-y-6">
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <h2 class="text-base font-bold text-slate-900">ประวัติงานขนส่งและรายงานย้อนหลัง (History Log)</h2>
+          <p class="text-xs text-slate-500">ตรวจสอบประวัติการปฏิบัติงานของรถ คนขับ และรอบการขนส่งที่ผ่านมา</p>
+        </div>
+
+        <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
+                  <th class="py-3 px-4">เลขงาน</th>
+                  <th class="py-3 px-4">วันที่เริ่มงาน</th>
+                  <th class="py-3 px-4">ลูกค้า</th>
+                  <th class="py-3 px-4">จุดรับสินค้า</th>
+                  <th class="py-3 px-4">จุดส่งสินค้า</th>
+                  <th class="py-3 px-4">ทะเบียนรถ</th>
+                  <th class="py-3 px-4">คนขับ</th>
+                  <th class="py-3 px-4">สถานะ</th>
+                  <th class="py-3 px-4 text-right">รายละเอียด</th>
+                </tr>
+              </thead>
+              <tbody id="history-jobs-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===============================================================
+           TAB 8: DRIVER MOBILE VIEW SIMULATOR (จำลองหน้าจอมือถือคนขับ)
+      =============================================================== -->
+      <div id="pane-driver-view" class="tab-pane hidden flex items-center justify-center p-4">
+        <div class="mobile-device-frame">
+          <div class="mobile-notch"></div>
+          
+          <!-- Mobile Screen Header -->
+          <div class="bg-blue-600 text-white p-4 pt-3 flex items-center justify-between shadow">
+            <div>
+              <div class="text-[10px] text-blue-200 uppercase font-bold tracking-wider">NextRoute Driver</div>
+              <div class="font-bold text-sm">งานประจำรอบ: <span id="driver-sim-job-code">-</span></div>
+            </div>
+            <div class="px-2 py-0.5 rounded bg-blue-700 text-xs font-mono font-bold" id="driver-sim-plate">-</div>
+          </div>
+
+          <!-- Mobile Content -->
+          <div class="flex-1 overflow-y-auto p-4 space-y-4">
+            <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
+              <div class="text-[11px] text-slate-400 font-bold uppercase">คำแนะนำสำหรับคนขับ</div>
+              <div class="text-xs text-slate-700 mt-1">
+                เมื่อปฏิบัติภารกิจเสร็จในแต่ละขั้นตอน กรุณากดปุ่ม <strong>"อัปเดตขั้นตอนนี้"</strong> เพื่อส่งข้อมูลพิกัดและเวลาไปยังระบบส่วนกลางทันที
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <div class="text-xs font-bold text-slate-800">ขั้นตอนการดำเนินงาน:</div>
+              <div id="driver-sim-steps-list" class="space-y-2"></div>
+            </div>
+          </div>
+
+          <!-- Mobile Bottom Navigation -->
+          <div class="bg-white border-t border-slate-200 p-2.5 flex justify-around text-slate-500 text-[10px] font-semibold">
+            <span class="text-blue-600 flex flex-col items-center">งานของฉัน</span>
+            <span class="flex flex-col items-center">แผนที่</span>
+            <span class="flex flex-col items-center">ติดต่อแอดมิน</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- =====================================================================
+       MODAL: CREATE NEW JOB WIZARD (ตามสไลด์ 10)
+  ===================================================================== -->
+  <div id="modal-new-job" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] overflow-y-auto p-6 shadow-2xl space-y-5 animate-scaleIn">
+      <div class="flex items-center justify-between border-b pb-3">
+        <div>
+          <div class="text-xs font-bold uppercase text-blue-600">Route & Task Assignment Wizard</div>
+          <h3 class="text-base font-bold text-slate-900">สร้างงานขนส่งและจัดรอบรถใหม่</h3>
+        </div>
+        <button onclick="App.closeNewJobModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+        <!-- Transport Type Selector -->
+        <div class="md:col-span-2 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
+          <label class="block font-bold text-slate-800 mb-1.5">รูปแบบเส้นทางการขนส่ง *</label>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <label class="flex items-center gap-2.5 p-2 rounded-xl border border-slate-200 bg-white cursor-pointer hover:border-blue-400 has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50/50 transition">
+              <input type="radio" name="wiz-transport-type" id="wiz-type-domestic" value="domestic" checked class="text-blue-600 focus:ring-blue-500">
+              <div>
+                <span class="font-bold text-slate-800">🇹🇭 ขนส่งภายในประเทศ</span>
+                <span class="block text-[10px] text-slate-500">7 ขั้นตอน (รับสินค้า &rarr; ส่งสินค้า)</span>
+              </div>
+            </label>
+            <label class="flex items-center gap-2.5 p-2 rounded-xl border border-slate-200 bg-white cursor-pointer hover:border-purple-400 has-[:checked]:border-purple-600 has-[:checked]:bg-purple-50/50 transition">
+              <input type="radio" name="wiz-transport-type" id="wiz-type-crossborder" value="cross_border" class="text-purple-600 focus:ring-purple-500">
+              <div>
+                <span class="font-bold text-purple-900">🌐 ขนส่งข้ามแดน / ต่างประเทศ</span>
+                <span class="block text-[10px] text-purple-600 font-medium">8 ขั้นตอน (+ ยื่นเอกสารขออนุญาตข้ามแดน)</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="block font-bold text-slate-700 mb-1">เลือกลูกค้า *</label>
+          <select id="wiz-customer" class="w-full px-3 py-2 border rounded-xl font-medium"></select>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">ประเภทสินค้าและผลิตภัณฑ์ *</label>
+          <input type="text" id="wiz-product-type" value="น้ำมันดีเซล B7" class="w-full px-3 py-2 border rounded-xl font-medium">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">ปริมาณที่บรรทุก *</label>
+          <input type="text" id="wiz-product-qty" value="32,000 ลิตร" class="w-full px-3 py-2 border rounded-xl font-medium">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">จุดรับสินค้า (ต้นทาง) *</label>
+          <select id="wiz-pickup" class="w-full px-3 py-2 border rounded-xl font-medium"></select>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">จุดส่งสินค้า (ปลายทาง) *</label>
+          <select id="wiz-dropoff" class="w-full px-3 py-2 border rounded-xl font-medium"></select>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">เลือกรถบรรทุก (เฉพาะคันที่ว่าง) *</label>
+          <select id="wiz-vehicle" class="w-full px-3 py-2 border rounded-xl font-medium"></select>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">เลือกคนขับ (มีใบขับขี่ ท.4) *</label>
+          <select id="wiz-driver" class="w-full px-3 py-2 border rounded-xl font-medium"></select>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">วันที่ออกเดินทาง *</label>
+          <input type="date" id="wiz-dep-date" value="2026-11-10" class="w-full px-3 py-2 border rounded-xl font-medium">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">เวลาออกเดินทาง *</label>
+          <input type="time" id="wiz-dep-time" value="09:00" class="w-full px-3 py-2 border rounded-xl font-medium">
+        </div>
+
+        <div class="md:col-span-2 flex items-center justify-between px-1">
+          <label class="flex items-center gap-2 cursor-pointer text-slate-700">
+            <input type="checkbox" id="wiz-return-company" checked class="rounded text-blue-600 focus:ring-blue-500">
+            <span class="font-medium">คำนวณรอบเดินทางกลับสำนักงานใหญ่ (ชลบุรี)</span>
+          </label>
+          <span class="text-[11px] text-slate-400">ความเร็วมาตรฐาน 65 กม./ชม. | กฎพักทุก 4 ชม. พัก 30 นาที</span>
+        </div>
+
+        <!-- Live ETA & Safety Preview Box -->
+        <div id="wiz-eta-preview" class="md:col-span-2 p-3.5 bg-blue-50/70 border border-blue-200 rounded-2xl space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-bold uppercase text-blue-700 tracking-wide">⏱️ สรุปเวลาถึงโดยประมาณ (Auto ETA & Safety Check)</span>
+            <span id="wiz-eta-rest-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">-</span>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+            <div class="bg-white p-2 rounded-xl border border-blue-100">
+              <div class="text-[10px] text-slate-500">ระยะทางส่ง / ไป-กลับ</div>
+              <div id="wiz-eta-dist" class="font-bold text-slate-800 font-mono mt-0.5">-</div>
+            </div>
+            <div class="bg-white p-2 rounded-xl border border-blue-100">
+              <div class="text-[10px] text-slate-500">เวลาดำเนินการรวม</div>
+              <div id="wiz-eta-hours" class="font-bold text-slate-800 font-mono mt-0.5">-</div>
+            </div>
+            <div class="bg-white p-2 rounded-xl border border-blue-100">
+              <div class="text-[10px] text-emerald-600 font-semibold">คาดว่าถึงปลายทาง (ETA)</div>
+              <div id="wiz-eta-delivery" class="font-bold text-emerald-700 font-mono mt-0.5">-</div>
+            </div>
+            <div class="bg-white p-2 rounded-xl border border-blue-100">
+              <div class="text-[10px] text-purple-600 font-semibold">เวลากลับถึงบริษัท</div>
+              <div id="wiz-eta-return" class="font-bold text-purple-700 font-mono mt-0.5">-</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-3 pt-3 border-t">
+        <button onclick="App.closeNewJobModal()" class="px-4 py-2 border rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">
+          ยกเลิก
+        </button>
+        <button onclick="App.submitNewJob()" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20">
+          ยืนยันและมอบหมายงาน
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       MODAL: EMERGENCY ADMIN OVERRIDE (เฉพาะกรณีฉุกเฉิน)
+  ===================================================================== -->
+  <div id="modal-admin-override" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-scaleIn border-t-4 border-amber-500">
+      <div class="flex items-center justify-between border-b pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-sm">
+            ⚠️
+          </div>
+          <div>
+            <div class="text-[10px] font-bold uppercase text-amber-700">Admin Emergency Override</div>
+            <h3 class="text-base font-bold text-slate-900">บันทึกการแก้ไขสถานะกรณีฉุกเฉิน</h3>
+          </div>
+        </div>
+        <button onclick="App.closeAdminOverrideModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 leading-relaxed">
+        <strong>คำเตือน:</strong> ฟังก์ชันนี้อนุญาตเฉพาะกรณีฉุกเฉินที่คนขับไม่สามารถใช้อุปกรณ์ได้ เช่น <em>โทรศัพท์แบตหมด, พื้นที่ไม่มีสัญญาณอินเทอร์เน็ต, หรือเกิดเหตุขัดข้องทางเทคนิค</em> ทุกการแก้ไขจะถูกบันทึกประวัติการ Audit อย่างเข้มงวด
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">ใบงานที่ต้องการแก้ไข:</label>
+          <div id="override-job-display" class="p-2.5 bg-slate-100 rounded-xl font-mono font-bold text-slate-800">-</div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">เลือกสถานะที่ต้องการเปลี่ยนเป็น: *</label>
+          <select id="override-target-status" class="w-full px-3 py-2 border rounded-xl font-bold text-blue-700 bg-white"></select>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">สาเหตุความจำเป็นฉุกเฉิน (Audit Reason): *</label>
+          <select id="override-reason-select" class="w-full px-3 py-2 border rounded-xl font-medium mb-1.5" onchange="document.getElementById('override-reason-custom').value = this.value">
+            <option value="คนขับโทรแจ้งด้วยวาจา (โทรศัพท์แบตเตอรี่หมด)">คนขับโทรแจ้งด้วยวาจา (โทรศัพท์แบตเตอรี่หมด)</option>
+            <option value="อยู่ในพื้นที่หุบเขา/อับสัญญาณอินเทอร์เน็ต">อยู่ในพื้นที่หุบเขา/อับสัญญาณอินเทอร์เน็ต</option>
+            <option value="อุปกรณ์ขัดข้อง ส่งพิกัดไม่ได้">อุปกรณ์ขัดข้อง ส่งพิกัดไม่ได้</option>
+            <option value="กรณีพิเศษ: มีการเปลี่ยนเส้นทางหรือจุดส่งฉุกเฉิน">กรณีพิเศษ: มีการเปลี่ยนเส้นทางหรือจุดส่งฉุกเฉิน</option>
+          </select>
+          <input type="text" id="override-reason-custom" value="คนขับโทรแจ้งด้วยวาจา (โทรศัพท์แบตเตอรี่หมด)" class="w-full px-3 py-2 border rounded-xl text-xs" placeholder="หรือระบุสาเหตุเพิ่มเติม...">
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-3 pt-3 border-t">
+        <button onclick="App.closeAdminOverrideModal()" class="px-4 py-2 border rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">
+          ยกเลิก
+        </button>
+        <button onclick="App.submitAdminOverride()" class="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-md shadow-amber-500/20">
+          ยืนยันการ Override ฉุกเฉิน
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       MODAL: CUSTOMS & CROSS-BORDER PERMIT DETAILS
+  ===================================================================== -->
+  <div id="modal-customs-permit" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-5 animate-scaleIn border-t-4 border-purple-600">
+      <div class="flex items-center justify-between border-b pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-base">
+            🌐
+          </div>
+          <div>
+            <div class="text-[10px] font-bold uppercase text-purple-700">Customs Clearance & Border Permit</div>
+            <h3 class="text-base font-bold text-slate-900">เอกสารการขออนุญาตขนส่งสินค้าข้ามแดน</h3>
+          </div>
+        </div>
+        <button onclick="App.closeCustomsPermitModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="p-4 bg-purple-50 border border-purple-200 rounded-2xl space-y-2 text-xs">
+        <div class="font-bold text-purple-900 text-sm">ใบอนุญาตขนส่งวัตถุอันตรายข้ามแดน (International DG Permit)</div>
+        <div class="text-slate-600 leading-relaxed">
+          ตามความตกลงว่าด้วยการอำนวยความสะดวกในการขนส่งข้ามพรมแดน (GMS CBTA) ใบอนุญาตฉบับนี้ออกให้โดย <strong>กรมการขนส่งทางบก (ขบ.)</strong> และ <strong>กรมศุลกากร</strong> เพื่ออนุญาตให้รถบรรทุกขนส่งก๊าซ/น้ำมันข้ามแดนผ่านด่านศุลกากรอย่างถูกต้องตามกฎหมาย
+        </div>
+      </div>
+
+      <div class="space-y-3 text-xs" id="customs-permit-details-body">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <div class="flex justify-end pt-3 border-t">
+        <button onclick="App.closeCustomsPermitModal()" class="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition">
+          ปิดหน้าต่าง
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       MODAL: TRIP MILESTONES & SAFETY REST SCHEDULE (แผนเวลาเดินทางรายจุด)
+  ===================================================================== -->
+  <div id="modal-trip-milestones" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl space-y-5 animate-scaleIn border-t-4 border-blue-600">
+      <div class="flex items-center justify-between border-b pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-base">
+            🗺️
+          </div>
+          <div>
+            <div class="text-[10px] font-bold uppercase text-blue-600">Safety & Route Schedule (ETA Engine)</div>
+            <h3 id="milestones-modal-title" class="text-base font-bold text-slate-900">แผนเวลาการเดินทางและจุดพักรถ</h3>
+          </div>
+        </div>
+        <button onclick="App.closeMilestonesModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- KPI Summary Row -->
+      <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+          <div class="text-[10px] text-slate-500">ระยะทางรวม (ไป-กลับ)</div>
+          <div id="ms-res-dist" class="font-bold text-slate-900 font-mono mt-0.5 text-sm">-</div>
+        </div>
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+          <div class="text-[10px] text-slate-500">เวลาดำเนินการรวม</div>
+          <div id="ms-res-hours" class="font-bold text-slate-900 font-mono mt-0.5 text-sm">-</div>
+        </div>
+        <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+          <div class="text-[10px] text-amber-700 font-semibold">พักรถ (ตามกฎ 4 ชม.)</div>
+          <div id="ms-res-rest" class="font-bold text-amber-700 font-mono mt-0.5 text-sm">-</div>
+        </div>
+        <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+          <div class="text-[10px] text-emerald-700 font-semibold">ETA ถึงปลายทาง</div>
+          <div id="ms-res-eta" class="font-bold text-emerald-700 font-mono mt-0.5 text-[11px] leading-tight">-</div>
+        </div>
+        <div class="p-3 bg-purple-50 border border-purple-200 rounded-xl col-span-2 sm:col-span-1">
+          <div class="text-[10px] text-purple-700 font-semibold">กลับถึงบริษัท</div>
+          <div id="ms-res-return" class="font-bold text-purple-700 font-mono mt-0.5 text-[11px] leading-tight">-</div>
+        </div>
+      </div>
+
+      <!-- Milestones Table -->
+      <div class="border border-slate-200 rounded-2xl overflow-hidden">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
+              <th class="py-2.5 px-3 text-center">จุดที่</th>
+              <th class="py-2.5 px-3">จุดหมาย / กิจกรรม</th>
+              <th class="py-2.5 px-3">ระยะทางสะสม</th>
+              <th class="py-2.5 px-3">เวลาโดยประมาณ</th>
+              <th class="py-2.5 px-3">หมายเหตุ</th>
+            </tr>
+          </thead>
+          <tbody id="milestones-modal-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="flex justify-end pt-2 border-t">
+        <button onclick="App.closeMilestonesModal()" class="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition">
+          ปิดหน้าต่าง
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       MODAL: ADD NEW DRIVER (เพิ่มพนักงานขับรถใหม่)
+  ===================================================================== -->
+  <div id="modal-new-driver" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl space-y-5 animate-scaleIn border-t-4 border-blue-600">
+      <div class="flex items-center justify-between border-b pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-base">
+            👤
+          </div>
+          <div>
+            <div class="text-[10px] font-bold uppercase text-blue-600">Driver Registration</div>
+            <h3 class="text-base font-bold text-slate-900">เพิ่มพนักงานขับรถใหม่</h3>
+          </div>
+        </div>
+        <button onclick="App.closeNewDriverModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+        <div class="md:col-span-2">
+          <label class="block font-bold text-slate-700 mb-1">ชื่อ-นามสกุล พนักงานขับรถ *</label>
+          <input type="text" id="drv-name" placeholder="เช่น นายเอกชัย มั่นใจ" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">เบอร์โทรศัพท์ติดต่อ *</label>
+          <input type="text" id="drv-phone" placeholder="089-123-4567" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">ประสบการณ์ขับรถ (ปี)</label>
+          <input type="number" id="drv-exp-years" value="4" min="0" max="50" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">ประเภทใบขับขี่ *</label>
+          <select id="drv-license-type" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="ท.4 (วัตถุอันตราย)">ท.4 (วัตถุอันตราย)</option>
+            <option value="ท.4 สากล (ข้ามแดน/วัตถุอันตราย)">ท.4 สากล (ข้ามแดน/วัตถุอันตราย)</option>
+            <option value="ท.3 (รถพ่วง/กึ่งพ่วง)">ท.3 (รถพ่วง/กึ่งพ่วง)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">เลขที่ใบอนุญาตขับขี่ *</label>
+          <input type="text" id="drv-license-no" placeholder="ท4-1002358" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-medium font-mono focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="font-bold text-slate-700">รถบรรทุกที่สังกัด / มอบหมาย</label>
+            <button type="button" onclick="App.toggleInlineNewVehicle()" id="btn-toggle-inline-vehicle" class="text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline">
+              + เพิ่มรถใหม่
+            </button>
+          </div>
+          <select id="drv-vehicle-plate" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">สถานะเริ่มต้น</label>
+          <select id="drv-status" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="ready" selected>พร้อมใช้งาน (รับงานได้)</option>
+            <option value="leave">ลางาน</option>
+            <option value="offline">พักกะ / ออฟไลน์</option>
+          </select>
+        </div>
+
+        <!-- Inline New Vehicle Sub-form (แสดงเมื่อเลือกเพิ่มรถบรรทุกคันใหม่) -->
+        <div id="drv-new-vehicle-fields" class="md:col-span-2 p-4 bg-blue-50/70 border border-blue-200 rounded-2xl space-y-3 hidden">
+          <div class="flex items-center justify-between border-b border-blue-200/70 pb-2">
+            <div class="flex items-center gap-2 text-xs font-bold text-blue-900">
+              <span>🚚</span>
+              <span>ลงทะเบียนรถบรรทุกคันใหม่ (ผูกกับพนักงานคนนี้)</span>
+            </div>
+            <span class="text-[10px] text-blue-600 font-semibold">จอดเริ่มต้น: สำนักงานใหญ่ ชลบุรี</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">ทะเบียนรถใหม่ *</label>
+              <input type="text" id="drv-new-plate" placeholder="เช่น ชบ.73-8923" class="w-full px-3 py-2 bg-white border border-blue-200 rounded-xl font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">ยี่ห้อ / รุ่นรถ *</label>
+              <select id="drv-new-brand-model" class="w-full px-3 py-2 bg-white border border-blue-200 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="Volvo|FM370">Volvo FM370</option>
+                <option value="Scania|P360">Scania P360</option>
+                <option value="Isuzu|GXZ360">Isuzu GXZ360</option>
+                <option value="Hino|Profia 700">Hino Profia 700</option>
+                <option value="Other|Custom">อื่นๆ (ระบุเอง)...</option>
+              </select>
+            </div>
+            <div id="drv-new-custom-brand-wrap" class="hidden sm:col-span-2 grid grid-cols-2 gap-3">
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">ระบุยี่ห้อรถ *</label>
+                <input type="text" id="drv-new-custom-brand" placeholder="เช่น UD Trucks" class="w-full px-3 py-2 bg-white border border-blue-200 rounded-xl font-medium">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">ระบุรุ่นรถ *</label>
+                <input type="text" id="drv-new-custom-model" placeholder="เช่น Quester" class="w-full px-3 py-2 bg-white border border-blue-200 rounded-xl font-medium">
+              </div>
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">ประเภทการบรรทุก</label>
+              <input type="text" id="drv-new-type" value="น้ำมันและแก๊ส" class="w-full px-3 py-2 bg-white border border-blue-200 rounded-xl font-medium">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">ความจุถังบรรจุ</label>
+              <select id="drv-new-capacity" class="w-full px-3 py-2 bg-white border border-blue-200 rounded-xl font-medium">
+                <option value="30,000 ลิตร">30,000 ลิตร</option>
+                <option value="32,000 ลิตร" selected>32,000 ลิตร</option>
+                <option value="34,000 ลิตร">34,000 ลิตร</option>
+                <option value="35,000 ลิตร">35,000 ลิตร</option>
+                <option value="18 ตัน (LPG)">18 ตัน (LPG)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-3 pt-3 border-t">
+        <button onclick="App.closeNewDriverModal()" class="px-4 py-2 border rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">
+          ยกเลิก
+        </button>
+        <button onclick="App.submitNewDriver()" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20">
+          ยืนยันเพิ่มพนักงาน
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       MODAL: ADD NEW VEHICLE (เพิ่มรถบรรทุกใหม่)
+  ===================================================================== -->
+  <div id="modal-new-vehicle" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl space-y-5 animate-scaleIn border-t-4 border-indigo-600">
+      <div class="flex items-center justify-between border-b pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-base">
+            🚚
+          </div>
+          <div>
+            <div class="text-[10px] font-bold uppercase text-indigo-600">Fleet Registration</div>
+            <h3 class="text-base font-bold text-slate-900">เพิ่มรถบรรทุกเข้ากองรถ</h3>
+          </div>
+        </div>
+        <button onclick="App.closeNewVehicleModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">ทะเบียนรถใหม่ *</label>
+          <input type="text" id="veh-new-plate" placeholder="เช่น ชบ.73-8923" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">ยี่ห้อ / รุ่นรถ *</label>
+          <select id="veh-new-brand-model" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="Volvo|FM370">Volvo FM370</option>
+            <option value="Scania|P360">Scania P360</option>
+            <option value="Isuzu|GXZ360">Isuzu GXZ360</option>
+            <option value="Hino|Profia 700">Hino Profia 700</option>
+            <option value="Other|Custom">อื่นๆ (ระบุเอง)...</option>
+          </select>
+        </div>
+        <div id="veh-new-custom-brand-wrap" class="hidden md:col-span-2 grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">ระบุยี่ห้อรถ *</label>
+            <input type="text" id="veh-new-custom-brand" placeholder="เช่น UD Trucks" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-medium">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">ระบุรุ่นรถ *</label>
+            <input type="text" id="veh-new-custom-model" placeholder="เช่น Quester" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-medium">
+          </div>
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">ประเภทการบรรทุก</label>
+          <input type="text" id="veh-new-type" value="น้ำมันและแก๊ส" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-medium">
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">ความจุถังบรรจุ</label>
+          <select id="veh-new-capacity" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-medium">
+            <option value="30,000 ลิตร">30,000 ลิตร</option>
+            <option value="32,000 ลิตร" selected>32,000 ลิตร</option>
+            <option value="34,000 ลิตร">34,000 ลิตร</option>
+            <option value="35,000 ลิตร">35,000 ลิตร</option>
+            <option value="18 ตัน (LPG)">18 ตัน (LPG)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">คนขับประจำรถ (ถ้ามี)</label>
+          <select id="veh-new-driver" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-medium"></select>
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">สถานะรถเริ่มต้น</label>
+          <select id="veh-new-status" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-medium">
+            <option value="ready" selected>พร้อมรับงาน (จอดที่สำนักงานใหญ่)</option>
+            <option value="maintenance">ตรวจเช็คสภาพ / ซ่อมบำรุง</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-3 pt-3 border-t">
+        <button onclick="App.closeNewVehicleModal()" class="px-4 py-2 border rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">
+          ยกเลิก
+        </button>
+        <button onclick="App.submitNewVehicle()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-500/20">
+          ยืนยันเพิ่มรถบรรทุก
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       MODAL: SINGLE-VEHICLE GPS & JOB DETAIL (Option B - เจาะลึกรายคันแบบ Popup)
+  ===================================================================== -->
+  <div id="modal-vehicle-detail" class="fixed inset-0 bg-slate-900/65 backdrop-blur-sm z-50 flex items-center justify-center hidden p-3 sm:p-5">
+    <div class="bg-white rounded-3xl max-w-6xl w-full max-h-[92vh] overflow-y-auto p-5 sm:p-6 shadow-2xl space-y-5 animate-scaleIn border-t-4 border-blue-600">
+      <!-- Header Bar -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-3">
+        <div class="flex items-start sm:items-center gap-3">
+          <div class="w-11 h-11 rounded-2xl bg-blue-50 text-blue-700 border border-blue-200 flex items-center justify-center text-xl shrink-0">
+            🚚
+          </div>
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <h3 id="vd-plate" class="text-xl font-black text-slate-900 font-mono">-</h3>
+              <span id="vd-model" class="px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-blue-100 text-blue-700">-</span>
+              <span id="vd-status-badge" class="px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-slate-100 text-slate-700">-</span>
+            </div>
+            <div id="vd-meta-sub" class="text-xs text-slate-500 mt-0.5">-</div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2.5 self-end sm:self-center">
+          <select id="vd-vehicle-select" class="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+          <button onclick="App.closeVehicleDetailModal()" class="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition" title="ปิดหน้าต่าง">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- 2-Column Body: Left = Single-Vehicle Map + Telemetry | Right = Driver + Job + Status Progress -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <!-- Left Column (Map & Live Telemetry) -->
+        <div class="lg:col-span-7 space-y-3">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+            <div class="p-3 bg-slate-50 border border-slate-200/80 rounded-2xl">
+              <div class="text-[10px] text-slate-500">ความเร็วปัจจุบัน</div>
+              <div id="vd-speed" class="text-base font-black text-blue-600 font-mono mt-0.5">-</div>
+            </div>
+            <div class="p-3 bg-slate-50 border border-slate-200/80 rounded-2xl">
+              <div class="text-[10px] text-slate-500">ระดับน้ำมัน</div>
+              <div id="vd-fuel" class="text-base font-black text-slate-800 font-mono mt-0.5">-</div>
+            </div>
+            <div class="p-3 bg-slate-50 border border-slate-200/80 rounded-2xl">
+              <div class="text-[10px] text-slate-500">ระยะทางคงเหลือ</div>
+              <div id="vd-rem-dist" class="text-base font-black text-indigo-700 font-mono mt-0.5">-</div>
+            </div>
+            <div class="p-3 bg-emerald-50 border border-emerald-200/80 rounded-2xl">
+              <div class="text-[10px] text-emerald-700 font-semibold">คาดว่าถึง (Live ETA)</div>
+              <div id="vd-live-eta" class="text-base font-black text-emerald-700 font-mono mt-0.5">-</div>
+            </div>
+          </div>
+
+          <div id="vd-map" class="w-full h-[340px] sm:h-[420px] rounded-2xl border border-slate-200 z-0"></div>
+
+          <div class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-slate-50 border border-slate-200/70 rounded-xl text-[11px] text-slate-600">
+            <div class="flex flex-wrap items-center gap-3">
+              <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span> จุดรับสินค้า</span>
+              <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-rose-600"></span> จุดส่ง / ด่านข้ามแดน</span>
+              <span class="flex items-center gap-1.5"><span class="w-4 h-0.5 bg-emerald-500 inline-block"></span> เส้นทางที่ผ่านมา</span>
+              <span class="flex items-center gap-1.5"><span class="w-4 border-t-2 border-dashed border-blue-600 inline-block"></span> เส้นทางที่เหลือ</span>
+            </div>
+            <span class="text-[10px] text-slate-400 font-medium">แสดงเฉพาะรถคันนี้เท่านั้น</span>
+          </div>
+        </div>
+
+        <!-- Right Column (Driver + Job Details + Status Flow Progress) -->
+        <div class="lg:col-span-5 space-y-4">
+          <!-- Driver Card -->
+          <div class="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2 text-xs">
+            <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+              <span class="font-bold text-slate-800">พนักงานขับรถประจำ</span>
+              <span id="vd-driver-status" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700">-</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-slate-500">ชื่อ-นามสกุล:</span>
+              <strong id="vd-driver-name" class="text-slate-900">-</strong>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-slate-500">เบอร์โทรติดต่อ:</span>
+              <a id="vd-driver-phone" href="#" class="font-bold text-blue-600 hover:underline">-</a>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-slate-500">ใบอนุญาตขับขี่:</span>
+              <span id="vd-driver-license" class="font-medium text-slate-700">-</span>
+            </div>
+          </div>
+
+          <!-- Active / Latest Job Details -->
+          <div id="vd-job-details-box" class="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm space-y-2.5 text-xs">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+              <span class="font-bold text-slate-800" id="vd-job-heading">รายละเอียดงานขนส่ง</span>
+              <span id="vd-job-type-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700">-</span>
+            </div>
+            <div id="vd-job-body" class="space-y-2">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+
+          <!-- Job Status Flow Progress (Read-only) -->
+          <div id="vd-status-list-box" class="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm space-y-3">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+              <span class="text-xs font-bold text-slate-800">สถานะความคืบหน้าของงาน</span>
+              <span id="vd-status-step-badge" class="text-[11px] font-bold text-blue-600">-</span>
+            </div>
+            <div id="vd-status-steps" class="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="pointer-events-none"></div>
+
+  <!-- App Scripts -->
+  <script src="js/data.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/eta.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

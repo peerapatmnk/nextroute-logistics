@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NextRoute Tracking - ติดตามสถานะงานขนส่งสินค้า</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
+
+  <!-- Header -->
+  <header class="bg-white border-b border-slate-200 px-6 py-4 shadow-sm flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+      </div>
+      <div>
+        <div class="font-bold text-slate-900 text-base">NextRoute Tracking Portal</div>
+        <div class="text-xs text-slate-500">ระบบติดตามการขนส่งผลิตภัณฑ์ปิโตรเลียมสำหรับลูกค้า</div>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <a href="index.html" class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-semibold text-slate-700 transition">
+        &larr; กลับเข้าระบบจัดการ (Admin)
+      </a>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 space-y-6">
+    <!-- Search Bar -->
+    <div class="p-6 bg-gradient-to-r from-blue-700 to-indigo-800 text-white rounded-3xl shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
+      <div>
+        <h2 class="text-xl font-black">ค้นหาสถานะงานขนส่ง</h2>
+        <p class="text-xs text-blue-100 mt-1">กรอกรหัสงาน (เช่น JN-001 หรือ JN-2026-001) เพื่อติดตามตำแหน่งและเวลาถึง ETA</p>
+      </div>
+      <div class="flex items-center gap-2 w-full md:w-auto">
+        <input type="text" id="track-input" placeholder="กรอกเลขงาน เช่น JN-001" value="JN-001" class="px-4 py-2.5 rounded-xl text-slate-800 font-bold text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 w-full md:w-64 shadow">
+        <button onclick="TrackApp.search()" class="px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold text-sm rounded-xl shadow transition shrink-0">
+          ค้นหา &rarr;
+        </button>
+      </div>
+    </div>
+
+    <!-- Tracking Result Box -->
+    <div id="track-result-card" class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold uppercase text-slate-400 tracking-wider">ใบงานขนส่ง</span>
+            <span id="res-type-badge" class="px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-blue-100 text-blue-700">🇹🇭 ในประเทศ</span>
+          </div>
+          <div class="flex items-center gap-3 mt-1">
+            <h3 id="res-code" class="text-2xl font-black text-slate-900 font-mono">JN-2026-001</h3>
+            <span id="res-status-badge" class="px-3 py-1 text-xs font-bold rounded-full bg-blue-100 text-blue-700">กำลังเดินทาง</span>
+          </div>
+        </div>
+        <div class="text-left sm:text-right">
+          <div class="text-xs text-slate-500">เวลาถึงโดยประมาณ (ETA)</div>
+          <div id="res-eta" class="text-lg font-bold text-emerald-600 font-mono mt-0.5">-</div>
+          <div id="res-eta-note" class="text-[11px] text-slate-500 mt-0.5">รวมเวลาโหลดสินค้าและมาตรฐานความปลอดภัยแล้ว</div>
+        </div>
+      </div>
+
+      <!-- Stepper Status Flow -->
+      <div class="space-y-2">
+        <div class="text-xs font-bold text-slate-700" id="res-flow-label">ความคืบหน้าสถานะการจัดส่ง (7 ขั้นตอน):</div>
+        <div id="track-stepper" class="stepper-container px-4 py-6">
+          <div class="stepper-line"></div>
+          <div id="track-stepper-active" class="stepper-line-active" style="width: 60%;"></div>
+          <div id="track-stepper-nodes" class="w-full flex justify-between relative z-10"></div>
+        </div>
+      </div>
+
+      <!-- Cross-Border Info Banner (เฉพาะงานข้ามแดน) -->
+      <div id="res-cb-box" class="p-4 bg-purple-50 border border-purple-200 rounded-2xl hidden space-y-2 text-xs">
+        <div class="flex items-center justify-between font-bold text-purple-900">
+          <div class="flex items-center gap-2">
+            <span>🌐</span>
+            <span>การขนส่งสินค้าข้ามแดน (International Cross-Border)</span>
+          </div>
+          <span class="text-[11px] bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full">ด่านศุลกากรอรัญประเทศ</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-slate-600 pt-1">
+          <div>เลขที่ใบอนุญาตข้ามแดน: <strong id="res-cb-permit" class="text-purple-700 font-mono">-</strong></div>
+          <div>ใบขนสินค้าขาออก: <strong id="res-cb-dec" class="text-purple-700 font-mono">-</strong></div>
+          <div>ซีลล็อกวาล์วศุลกากร: <strong id="res-cb-seal" class="text-amber-700 font-mono">-</strong></div>
+        </div>
+      </div>
+
+      <!-- Info Details & Map Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Details -->
+        <div class="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-100 text-xs">
+          <div class="font-bold text-slate-800 text-sm border-b pb-2">ข้อมูลการขนส่ง</div>
+          <div class="flex justify-between"><span>ผู้สั่งซื้อ (ลูกค้า):</span> <strong id="res-customer" class="text-slate-900">-</strong></div>
+          <div class="flex justify-between"><span>สินค้า/ผลิตภัณฑ์:</span> <strong id="res-product" class="text-indigo-600 font-medium">-</strong></div>
+          <div class="flex justify-between"><span>คลังต้นทาง:</span> <strong id="res-pickup" class="text-slate-800">-</strong></div>
+          <div class="flex justify-between"><span>จุดส่งสินค้าปลายทาง:</span> <strong id="res-dropoff" class="text-slate-800">-</strong></div>
+          <div class="flex justify-between"><span>ทะเบียนรถบรรทุก:</span> <strong id="res-plate" class="text-slate-900 font-mono">-</strong></div>
+          <div class="flex justify-between"><span>พนักงานขับรถ:</span> <strong id="res-driver" class="text-slate-900">-</strong></div>
+          <div class="flex justify-between pt-2 border-t border-slate-200/60"><span>ระยะทางขนส่ง:</span> <strong id="res-distance" class="text-slate-800 font-mono">-</strong></div>
+          <div class="flex justify-between"><span>จุดจอดพักตามกฎ 4 ชม.:</span> <strong id="res-rest-info" class="text-amber-700 font-semibold">-</strong></div>
+        </div>
+
+        <!-- Live Map Preview -->
+        <div class="h-64 rounded-2xl overflow-hidden border border-slate-200" id="track-map"></div>
+      </div>
+
+      <!-- Status History Logs -->
+      <div class="pt-4 border-t border-slate-100">
+        <h4 class="text-xs font-bold text-slate-800 mb-3">บันทึกขั้นตอนการเดินทางล่าสุด</h4>
+        <div id="track-timeline-list" class="space-y-2"></div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-400">
+    NextRoute Logistics Co., Ltd. &copy; 2026 - ระบบติดตามสถานะงานขนส่ง
+  </footer>
+
+  <script src="js/data.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/eta.js"></script>
+  <script>
+    const TrackApp = {
+      map: null,
+      markerVehicle: null,
+      markerPickup: null,
+      markerDropoff: null,
+
+      init() {
+        this.initMap();
+        this.search();
+      },
+
+      initMap() {
+        this.map = L.map('track-map', { zoomControl: false, attributionControl: false }).setView([13.25, 101.10], 9);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(this.map);
+      },
+
+      search() {
+        const query = document.getElementById("track-input").value.trim().toUpperCase();
+        const job = window.store.getJobs().find(j => j.id.toUpperCase() === query || j.code.toUpperCase() === query) || window.store.getJobs()[0];
+
+        if (!job) {
+          alert("ไม่พบข้อมูลใบงานนี้ กรุณาตรวจสอบรหัสงานอีกครั้ง");
+          return;
+        }
+
+        const cust = window.store.getCustomer(job.customerId) || { name: "-" };
+        const v = window.store.getVehicle(job.vehicleId) || { plate: "-", lat: 13.25, lng: 101.10 };
+        const d = window.store.getDriver(job.driverId) || { name: "-" };
+        const pLoc = window.store.getLocation(job.pickupLocId) || { name: "-", lat: 12.71, lng: 101.16 };
+        const dLoc = window.store.getLocation(job.dropoffLocId) || { name: "-", lat: 13.11, lng: 100.91 };
+        const statusMeta = window.store.getStatusMeta(job.currentStatusId, job) || { name: "-" };
+        const flow = window.store.getStatusFlow(job);
+
+        document.getElementById("res-code").textContent = job.code;
+        document.getElementById("res-status-badge").textContent = statusMeta.name;
+        document.getElementById("res-status-badge").className = `px-3 py-1 text-xs font-bold rounded-full ${statusMeta.key === 'border_customs' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`;
+        document.getElementById("res-eta").textContent = job.eta || "-";
+        document.getElementById("res-customer").textContent = cust.name;
+        document.getElementById("res-product").textContent = `${job.productType} (${job.productQty})`;
+        document.getElementById("res-pickup").textContent = pLoc.name;
+        document.getElementById("res-dropoff").textContent = dLoc.name;
+        document.getElementById("res-plate").textContent = v.plate;
+        document.getElementById("res-driver").textContent = d.name;
+
+        // ETA & Safety Rest Details for Customer transparency
+        const tripPlan = window.ETAEngine ? window.ETAEngine.getJobTripPlan(job) : null;
+        const delivDist = job.routeDistanceKm || tripPlan?.deliveryDistanceKm || 0;
+        const restCount = job.restCount ?? tripPlan?.restStopsCount ?? (job.hasRestStop ? 1 : 0);
+        const restMins = job.restDurationMinutes ?? tripPlan?.totalRestMinutes ?? 0;
+
+        document.getElementById("res-distance").textContent = `${delivDist} กม.`;
+        const elRestInfo = document.getElementById("res-rest-info");
+        const elEtaNote = document.getElementById("res-eta-note");
+        if (restCount > 0 || restMins > 0) {
+          if (elRestInfo) {
+            elRestInfo.className = "text-amber-700 font-semibold";
+            elRestInfo.textContent = `พัก ${restCount || 1} ครั้ง (รวม ${restMins || 30} นาที)`;
+          }
+          if (elEtaNote) {
+            elEtaNote.innerHTML = `<span class="text-emerald-700 font-medium">✓ รวมเวลาโหลดสินค้าและเวลาพักรถตามกฎหมาย (${restMins || 30} นาที) แล้ว</span>`;
+          }
+        } else {
+          if (elRestInfo) {
+            elRestInfo.className = "text-emerald-700 font-medium";
+            elRestInfo.textContent = "ไม่มี (ขับต่อเนื่องไม่เกิน 4 ชม.)";
+          }
+          if (elEtaNote) {
+            elEtaNote.textContent = `✓ คำนวณรวมเวลาโหลดสินค้าและระยะทาง ${delivDist} กม. แล้ว`;
+          }
+        }
+
+        // Type badge & label
+        const typeBadge = document.getElementById("res-type-badge");
+        const flowLabel = document.getElementById("res-flow-label");
+        const cbBox = document.getElementById("res-cb-box");
+
+        if (job.isCrossBorder) {
+          if (typeBadge) {
+            typeBadge.className = "px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-purple-100 text-purple-800 border border-purple-200";
+            typeBadge.textContent = "🌐 ขนส่งข้ามแดน (8 ขั้นตอน)";
+          }
+          if (flowLabel) flowLabel.textContent = "ความคืบหน้าสถานะการจัดส่งข้ามแดน (8 ขั้นตอน):";
+          if (cbBox) {
+            cbBox.classList.remove("hidden");
+            document.getElementById("res-cb-permit").textContent = job.customsPermitNo || "CB-THKH-2026/0491";
+            document.getElementById("res-cb-dec").textContent = job.customsDeclarationNo || "กศก.120-690214";
+            document.getElementById("res-cb-seal").textContent = job.customsSealNo || "SEAL-CUSTOMS-8821";
+          }
+        } else {
+          if (typeBadge) {
+            typeBadge.className = "px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-blue-100 text-blue-700";
+            typeBadge.textContent = "🇹🇭 ขนส่งในประเทศ (7 ขั้นตอน)";
+          }
+          if (flowLabel) flowLabel.textContent = "ความคืบหน้าสถานะการจัดส่ง (7 ขั้นตอน):";
+          if (cbBox) cbBox.classList.add("hidden");
+        }
+
+        // Stepper
+        const pct = Math.min(100, Math.max(0, ((job.currentStatusId - 1) / (flow.length - 1)) * 100));
+        document.getElementById("track-stepper-active").style.width = `calc(${pct}% * 0.92)`;
+
+        document.getElementById("track-stepper-nodes").innerHTML = flow.map(s => {
+          const isDone = s.id < job.currentStatusId;
+          const isCur = s.id === job.currentStatusId;
+          return `
+            <div class="stepper-node ${isDone ? 'completed' : isCur ? 'active' : ''}">
+              <div class="stepper-circle">
+                ${isDone ? '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>' : s.id}
+              </div>
+              <div class="text-[11px] font-bold mt-1 text-center ${isCur ? (s.key === 'border_customs' ? 'text-purple-600' : 'text-blue-600') : isDone ? 'text-emerald-700' : 'text-slate-400'}">${s.name}</div>
+            </div>
+          `;
+        }).join("");
+
+        // Map updates
+        if (this.markerVehicle) this.map.removeLayer(this.markerVehicle);
+        if (this.markerPickup) this.map.removeLayer(this.markerPickup);
+        if (this.markerDropoff) this.map.removeLayer(this.markerDropoff);
+
+        this.markerPickup = L.marker([pLoc.lat, pLoc.lng]).addTo(this.map).bindPopup(`<b>จุดรับ:</b> ${pLoc.name}`);
+        this.markerDropoff = L.marker([dLoc.lat, dLoc.lng]).addTo(this.map).bindPopup(`<b>จุดส่ง:</b> ${dLoc.name}`);
+        this.markerVehicle = L.circleMarker([v.lat, v.lng], { radius: 9, color: '#2563eb', fillColor: '#3b82f6', fillOpacity: 0.9 }).addTo(this.map).bindPopup(`<b>รถขนส่ง:</b> ${v.plate}`);
+
+        const group = new L.featureGroup([this.markerPickup, this.markerDropoff, this.markerVehicle]);
+        this.map.fitBounds(group.getBounds(), { padding: [30, 30] });
+
+        // Timeline
+        const tList = document.getElementById("track-timeline-list");
+        if (job.timeline) {
+          tList.innerHTML = job.timeline.map(t => `
+            <div class="flex items-center justify-between text-xs py-1.5 border-b border-slate-100 last:border-0">
+              <span class="font-bold text-slate-700">${t.name}</span>
+              <span class="text-slate-500 font-mono">${t.time} น.</span>
+            </div>
+          `).reverse().join("");
+        }
+      }
+    };
+
+    window.addEventListener("DOMContentLoaded", () => TrackApp.init());
+  </script>
+</body>
+</html>
