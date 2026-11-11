@@ -6,7 +6,27 @@ const App = {
   activeTab: "dashboard",
   selectedJobId: "JN-001",
   selectedDetailVehicleId: null,
+  editingDriverId: null,
+  editingVehicleId: null,
+  _lastDetailStepKey: null,
   mapManagers: {},
+
+  VEHICLE_STATUS_MAP: {
+    running: { cls: "bg-emerald-100 text-emerald-700 border border-emerald-200", label: "กำลังวิ่งส่งสินค้า", dot: "bg-emerald-500" },
+    resting: { cls: "bg-amber-100 text-amber-800 border border-amber-200", label: "จอดพัก / ด่านตรวจ", dot: "bg-amber-500" },
+    idle: { cls: "bg-blue-100 text-blue-700 border border-blue-200", label: "พร้อมรับงาน", dot: "bg-blue-500" },
+    ready: { cls: "bg-blue-100 text-blue-700 border border-blue-200", label: "พร้อมรับงาน", dot: "bg-blue-500" },
+    assigned: { cls: "bg-purple-100 text-purple-700 border border-purple-200", label: "รอออกเดินทาง", dot: "bg-purple-500" },
+    maintenance: { cls: "bg-rose-100 text-rose-700 border border-rose-200", label: "ตรวจเช็คสภาพ", dot: "bg-rose-500" },
+    offline: { cls: "bg-slate-100 text-slate-600 border border-slate-200", label: "ออฟไลน์", dot: "bg-slate-400" }
+  },
+
+  DRIVER_STATUS_MAP: {
+    on_duty: { cls: "bg-emerald-100 text-emerald-700 border border-emerald-200", label: "ปฏิบัติงาน" },
+    ready: { cls: "bg-blue-100 text-blue-700 border border-blue-200", label: "พร้อมใช้งาน" },
+    leave: { cls: "bg-amber-100 text-amber-800 border border-amber-200", label: "ลางาน" },
+    offline: { cls: "bg-slate-100 text-slate-600 border border-slate-200", label: "พักกะ/ออฟไลน์" }
+  },
 
   init() {
     this.bindEvents();
@@ -915,62 +935,191 @@ const App = {
   /* =====================================================================
      6. Fleet Management Render (13 รถบรรทุก และ 13 คนขับ)
   ===================================================================== */
+  resetFleetFilters() {
+    const searchEl = document.getElementById("fleet-search-input");
+    const filterEl = document.getElementById("fleet-status-filter");
+    if (searchEl) searchEl.value = "";
+    if (filterEl) filterEl.value = "all";
+    this.renderFleetManagement();
+  },
+
+  _matchesVehicleFilter(v, driverName, activeJob, pLoc, dLoc, query, statusFilter) {
+    const statusMap = {
+      all: () => true,
+      running: () => v.status === "running",
+      resting: () => v.status === "resting",
+      assigned: () => v.status === "assigned",
+      ready: () => v.status === "ready" || v.status === "idle",
+      maintenance: () => v.status === "maintenance",
+      inactive: () => v.status === "offline"
+    };
+    const matchStatus = (statusMap[statusFilter] || statusMap.all)();
+    if (!matchStatus) return false;
+    if (!query) return true;
+
+    const haystacks = [
+      v.id, v.plate, v.brand, v.model, v.type, driverName,
+      activeJob?.id, activeJob?.code, pLoc?.province, dLoc?.province
+    ];
+    return haystacks.some(txt => (txt || "").toLowerCase().includes(query));
+  },
+
+  _matchesDriverFilter(d, linkedVehicle, query, statusFilter) {
+    const statusMap = {
+      all: () => true,
+      running: () => d.status === "on_duty" && (!linkedVehicle || linkedVehicle.status === "running"),
+      resting: () => linkedVehicle?.status === "resting",
+      assigned: () => linkedVehicle?.status === "assigned",
+      ready: () => d.status === "ready",
+      maintenance: () => linkedVehicle?.status === "maintenance",
+      inactive: () => d.status === "leave" || d.status === "offline"
+    };
+    const matchStatus = (statusMap[statusFilter] || statusMap.all)();
+    if (!matchStatus) return false;
+    if (!query) return true;
+
+    const haystacks = [
+      d.id, d.name, d.phone, d.licenseType, d.licenseNo, d.vehiclePlate,
+      linkedVehicle?.brand, linkedVehicle?.model
+    ];
+    return haystacks.some(txt => (txt || "").toLowerCase().includes(query));
+  },
+
   renderFleetManagement() {
     const vehicles = window.store.getVehicles();
     const drivers = window.store.getDrivers();
+    const jobs = window.store.getJobs();
+
+    const query = (document.getElementById("fleet-search-input")?.value || "").trim().toLowerCase();
+    const statusFilter = document.getElementById("fleet-status-filter")?.value || "all";
+
+    const activeJobByVehicle = {};
+    jobs.forEach(j => {
+      if (j.vehicleId && !window.store.isJobCompleted(j) && !activeJobByVehicle[j.vehicleId]) {
+        activeJobByVehicle[j.vehicleId] = j;
+      }
+    });
+
+    const filteredVehicles = vehicles.filter(v => {
+      const d = v.driverId ? window.store.getDriver(v.driverId) : null;
+      const driverName = d ? d.name : "";
+      const activeJob = activeJobByVehicle[v.id] || null;
+      const pLoc = activeJob ? window.store.getLocation(activeJob.pickupLocId) : null;
+      const dLoc = activeJob ? window.store.getLocation(activeJob.dropoffLocId) : null;
+      return this._matchesVehicleFilter(v, driverName, activeJob, pLoc, dLoc, query, statusFilter);
+    });
+
+    const filteredDrivers = drivers.filter(d => {
+      const linkedVehicle = (d.vehiclePlate && !d.vehiclePlate.includes("สำรอง"))
+        ? window.store.getVehicle(d.vehiclePlate)
+        : vehicles.find(v => v.driverId === d.id) || null;
+      return this._matchesDriverFilter(d, linkedVehicle, query, statusFilter);
+    });
+
+    const summaryEl = document.getElementById("fleet-filter-summary");
+    if (summaryEl) {
+      summaryEl.textContent = (query || statusFilter !== "all")
+        ? `แสดงรถ ${filteredVehicles.length}/${vehicles.length} คัน • คนขับ ${filteredDrivers.length}/${drivers.length} คน`
+        : "";
+    }
 
     const vehicleGrid = document.getElementById("fleet-vehicle-grid");
     if (vehicleGrid) {
-      vehicleGrid.innerHTML = vehicles.map(v => {
-        const driver = v.driverId ? window.store.getDriver(v.driverId) : null;
-        const driverName = driver ? driver.name : "ยังไม่ระบุคนขับ";
-        return `
-          <div class="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm hover:border-blue-300 transition">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-base font-bold text-slate-900 font-mono">${v.plate}</span>
-              <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-100 text-blue-700">${v.brand} ${v.model}</span>
-            </div>
-            <div class="text-xs text-slate-500 mb-2">ความจุ: ${v.capacity} | ${v.type}</div>
-            <div class="text-xs text-slate-700 bg-slate-50 p-2 rounded-xl mb-3">
-              <div class="flex justify-between"><span>คนขับประจำ:</span> <strong class="text-slate-800">${driverName}</strong></div>
-              <div class="flex justify-between mt-1"><span>ระดับน้ำมัน:</span> <strong class="text-blue-600">${v.fuelLevel}%</strong></div>
-            </div>
-            <div class="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
-              <span class="text-slate-400 text-[11px]">${v.lastUpdate}</span>
-              <button onclick="App.openVehicleDetailModal('${v.id}')" class="text-blue-600 hover:text-blue-800 font-bold">
-                ดูพิกัด GPS &rarr;
-              </button>
-            </div>
+      if (filteredVehicles.length === 0) {
+        vehicleGrid.innerHTML = `
+          <div class="col-span-full p-8 bg-slate-50 border border-dashed border-slate-300 rounded-2xl text-center text-xs text-slate-500 space-y-2">
+            <div>ไม่พบรถบรรทุกที่ตรงกับเงื่อนไขการค้นหา</div>
+            <button type="button" onclick="App.resetFleetFilters()" class="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-blue-600 font-bold hover:bg-blue-50">
+              ล้างตัวกรองทั้งหมด
+            </button>
           </div>
         `;
-      }).join("");
+      } else {
+        vehicleGrid.innerHTML = filteredVehicles.map(v => {
+          const driver = v.driverId ? window.store.getDriver(v.driverId) : null;
+          const driverName = driver ? driver.name : "ยังไม่ระบุคนขับ";
+          const vBadge = this.VEHICLE_STATUS_MAP[v.status] || { cls: "bg-slate-100 text-slate-700 border border-slate-200", label: v.status, dot: "bg-slate-400" };
+          const activeJob = activeJobByVehicle[v.id] || null;
+          const pLoc = activeJob ? window.store.getLocation(activeJob.pickupLocId) : null;
+          const dLoc = activeJob ? window.store.getLocation(activeJob.dropoffLocId) : null;
+          const jobPill = activeJob
+            ? `<span class="px-2 py-0.5 text-[10px] font-mono font-bold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 truncate max-w-[165px]" title="${activeJob.id}: ${pLoc?.province || '-'} -> ${dLoc?.province || '-'}">${activeJob.id}${pLoc && dLoc ? ` • ${pLoc.province}&rarr;${dLoc.province}` : ""}</span>`
+            : `<span class="text-[10px] text-slate-400 font-medium">ไม่มีงานค้าง</span>`;
+
+          return `
+            <div class="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm hover:border-blue-300 transition flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between mb-1.5 gap-2">
+                  <span class="text-base font-bold text-slate-900 font-mono">${v.plate}</span>
+                  <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-100 text-blue-700 shrink-0">${v.brand} ${v.model}</span>
+                </div>
+                <div class="flex flex-wrap items-center justify-between gap-1.5 mb-2">
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full ${vBadge.cls}">
+                    <span class="w-1.5 h-1.5 rounded-full ${vBadge.dot}"></span>
+                    ${vBadge.label}
+                  </span>
+                  ${jobPill}
+                </div>
+                <div class="text-xs text-slate-500 mb-2">ความจุ: ${v.capacity} | ${v.type}</div>
+                <div class="text-xs text-slate-700 bg-slate-50 p-2 rounded-xl mb-3">
+                  <div class="flex justify-between gap-2"><span>คนขับประจำ:</span> <strong class="text-slate-800 truncate">${driverName}</strong></div>
+                  <div class="flex justify-between mt-1"><span>ระดับน้ำมัน:</span> <strong class="text-blue-600">${v.fuelLevel}%</strong></div>
+                </div>
+              </div>
+              <div class="flex items-center justify-between text-xs pt-2 border-t border-slate-100 gap-2">
+                <span class="text-slate-400 text-[11px] truncate">${v.lastUpdate}</span>
+                <div class="flex items-center gap-2 shrink-0">
+                  <button type="button" onclick="App.openEditVehicleModal('${v.id}')" class="px-2 py-1 text-[11px] font-semibold text-slate-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition">
+                    แก้ไข
+                  </button>
+                  <button type="button" onclick="App.openVehicleDetailModal('${v.id}')" class="text-blue-600 hover:text-blue-800 font-bold">
+                    ดูพิกัด GPS &rarr;
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join("");
+      }
     }
 
     const driverGrid = document.getElementById("fleet-driver-grid");
     if (driverGrid) {
-      const driverStatusBadgeMap = {
-        on_duty: { cls: "bg-emerald-100 text-emerald-700", label: "ปฏิบัติงาน" },
-        ready: { cls: "bg-blue-100 text-blue-700", label: "พร้อมใช้งาน" },
-        leave: { cls: "bg-amber-100 text-amber-800", label: "ลางาน" },
-        offline: { cls: "bg-slate-100 text-slate-600", label: "พักกะ/ออฟไลน์" }
-      };
-
-      driverGrid.innerHTML = drivers.map(d => {
-        const badge = driverStatusBadgeMap[d.status] || { cls: "bg-slate-100 text-slate-700", label: d.status };
-        return `
-          <div class="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm hover:border-blue-300 transition">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-sm font-bold text-slate-800">${d.name}</span>
-              <span class="px-2 py-0.5 text-[10px] font-bold rounded-full ${badge.cls}">
-                ${badge.label}
-              </span>
-            </div>
-            <div class="text-xs text-slate-500">โทร: <a href="tel:${d.phone}" class="text-blue-600 font-medium">${d.phone}</a></div>
-            <div class="text-xs text-slate-500 mt-1">ใบขับขี่: ${d.licenseType} (${d.licenseNo})</div>
-            <div class="text-[11px] text-slate-400 mt-1">ประจำรถ: <strong class="text-slate-700">${d.vehiclePlate || "-"}</strong> | ประสบการณ์ ${d.expYears} ปี</div>
+      if (filteredDrivers.length === 0) {
+        driverGrid.innerHTML = `
+          <div class="col-span-full p-8 bg-slate-50 border border-dashed border-slate-300 rounded-2xl text-center text-xs text-slate-500 space-y-2">
+            <div>ไม่พบพนักงานขับรถที่ตรงกับเงื่อนไขการค้นหา</div>
+            <button type="button" onclick="App.resetFleetFilters()" class="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-blue-600 font-bold hover:bg-blue-50">
+              ล้างตัวกรองทั้งหมด
+            </button>
           </div>
         `;
-      }).join("");
+      } else {
+        driverGrid.innerHTML = filteredDrivers.map(d => {
+          const badge = this.DRIVER_STATUS_MAP[d.status] || { cls: "bg-slate-100 text-slate-700", label: d.status };
+          return `
+            <div class="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm hover:border-blue-300 transition flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between mb-2 gap-2">
+                  <span class="text-sm font-bold text-slate-800 truncate">${d.name}</span>
+                  <span class="px-2 py-0.5 text-[10px] font-bold rounded-full shrink-0 ${badge.cls}">
+                    ${badge.label}
+                  </span>
+                </div>
+                <div class="text-xs text-slate-500">โทร: <a href="tel:${d.phone}" class="text-blue-600 font-medium">${d.phone}</a></div>
+                <div class="text-xs text-slate-500 mt-1">ใบขับขี่: ${d.licenseType} (${d.licenseNo})</div>
+                <div class="text-[11px] text-slate-400 mt-1">ประจำรถ: <strong class="text-slate-700">${d.vehiclePlate || "-"}</strong> | ประสบการณ์ ${d.expYears} ปี</div>
+              </div>
+              <div class="flex items-center justify-between text-[11px] pt-2.5 mt-3 border-t border-slate-100">
+                <span class="font-mono text-slate-400">รหัส: ${d.id}</span>
+                <button type="button" onclick="App.openEditDriverModal('${d.id}')" class="px-2.5 py-1 font-semibold text-slate-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition">
+                  แก้ไข / จัดการ
+                </button>
+              </div>
+            </div>
+          `;
+        }).join("");
+      }
     }
   },
 
@@ -984,42 +1133,60 @@ const App = {
     return `ชบ.73-${num}`;
   },
 
-  _initVehicleFormFields(prefix) {
+  _initVehicleFormFields(prefix, existingVehicle = null) {
     const elPlate = document.getElementById(`${prefix}-plate`);
-    if (elPlate) elPlate.value = this._suggestNextPlate();
+    if (elPlate) elPlate.value = existingVehicle ? existingVehicle.plate : this._suggestNextPlate();
 
     const selBM = document.getElementById(`${prefix}-brand-model`);
     const customWrap = document.getElementById(`${prefix}-custom-brand-wrap`);
+    const elCB = document.getElementById(`${prefix}-custom-brand`);
+    const elCM = document.getElementById(`${prefix}-custom-model`);
     const syncCustomWrap = () => {
       if (!customWrap || !selBM) return;
       customWrap.classList.toggle("hidden", selBM.value !== "Other|Custom");
     };
+
     if (selBM) {
-      selBM.value = "Volvo|FM370";
+      const combo = existingVehicle ? `${existingVehicle.brand}|${existingVehicle.model}` : "Volvo|FM370";
+      const hasPreset = Array.from(selBM.options).some(opt => opt.value === combo);
+      if (hasPreset) {
+        selBM.value = combo;
+        if (elCB) elCB.value = "";
+        if (elCM) elCM.value = "";
+      } else {
+        selBM.value = "Other|Custom";
+        if (elCB) elCB.value = existingVehicle?.brand || "";
+        if (elCM) elCM.value = existingVehicle?.model || "";
+      }
       selBM.onchange = syncCustomWrap;
       syncCustomWrap();
     }
 
-    const elCB = document.getElementById(`${prefix}-custom-brand`);
-    if (elCB) elCB.value = "";
-    const elCM = document.getElementById(`${prefix}-custom-model`);
-    if (elCM) elCM.value = "";
     const elType = document.getElementById(`${prefix}-type`);
-    if (elType) elType.value = "น้ำมันและแก๊ส";
+    if (elType) elType.value = existingVehicle?.type || "น้ำมันและแก๊ส";
     const elCap = document.getElementById(`${prefix}-capacity`);
-    if (elCap) elCap.value = "32,000 ลิตร";
+    if (elCap) {
+      const targetCap = existingVehicle?.capacity || "32,000 ลิตร";
+      if (!Array.from(elCap.options).some(opt => opt.value === targetCap)) {
+        const opt = document.createElement("option");
+        opt.value = targetCap;
+        opt.textContent = targetCap;
+        elCap.appendChild(opt);
+      }
+      elCap.value = targetCap;
+    }
   },
 
-  _readAndValidateVehicleForm(prefix) {
+  _readAndValidateVehicleForm(prefix, excludeVehicleId = null) {
     const elPlate = document.getElementById(`${prefix}-plate`);
     const plate = elPlate?.value.trim();
     if (!plate) {
-      this.showToast("กรุณากรอกทะเบียนรถบรรทุกใหม่", "error");
+      this.showToast("กรุณากรอกทะเบียนรถบรรทุก", "error");
       if (elPlate) elPlate.focus();
       return null;
     }
 
-    if (window.store.getVehicles().some(v => v.plate.toLowerCase() === plate.toLowerCase())) {
+    if (window.store.getVehicles().some(v => v.id !== excludeVehicleId && v.plate.toLowerCase() === plate.toLowerCase())) {
       this.showToast(`ทะเบียนรถ "${plate}" มีอยู่ในระบบแล้ว`, "error");
       if (elPlate) elPlate.focus();
       return null;
@@ -1046,6 +1213,36 @@ const App = {
     return { plate, brand, model, type, capacity };
   },
 
+  _populateDriverVehicleSelect(selectedPlate = "สำรอง (รอจัดรถ)") {
+    const selPlate = document.getElementById("drv-vehicle-plate");
+    if (!selPlate) return;
+
+    const vehicles = window.store.getVehicles();
+    selPlate.innerHTML =
+      `<option value="สำรอง (รอจัดรถ)">พนักงานขับรถสำรอง (ยังไม่ระบุรถประจำ)</option>` +
+      `<option value="__NEW__">➕ + เพิ่มรถบรรทุกคันใหม่...</option>` +
+      vehicles.map(v => {
+        const curDrv = v.driverId ? window.store.getDriver(v.driverId) : null;
+        const drvTag = curDrv ? ` - คนขับ: ${curDrv.name}` : " - ว่าง";
+        return `<option value="${v.plate}">${v.plate} (${v.brand} ${v.model}${drvTag})</option>`;
+      }).join("");
+
+    selPlate.onchange = () => this._syncInlineNewVehicleVisibility();
+    const hasMatch = Array.from(selPlate.options).some(o => o.value === selectedPlate);
+    selPlate.value = hasMatch ? selectedPlate : "สำรอง (รอจัดรถ)";
+    this._syncInlineNewVehicleVisibility();
+  },
+
+  _populateVehicleDriverSelect(selectedDriverId = "") {
+    const selDrv = document.getElementById("veh-new-driver");
+    if (!selDrv) return;
+
+    const drivers = window.store.getDrivers();
+    selDrv.innerHTML = `<option value="">ยังไม่ระบุคนขับประจำ</option>` +
+      drivers.map(d => `<option value="${d.id}">${d.name} (${d.vehiclePlate || "สำรอง"})</option>`).join("");
+    selDrv.value = drivers.some(d => d.id === selectedDriverId) ? selectedDriverId : "";
+  },
+
   _syncInlineNewVehicleVisibility() {
     const selPlate = document.getElementById("drv-vehicle-plate");
     const newFields = document.getElementById("drv-new-vehicle-fields");
@@ -1069,14 +1266,29 @@ const App = {
     this._syncInlineNewVehicleVisibility();
   },
 
+  _configureDriverModalChrome(driver = null) {
+    const isEdit = Boolean(driver);
+    const setTxt = (id, txt) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = txt;
+    };
+    setTxt("drv-modal-subtitle", isEdit ? `Edit Driver (${driver.id})` : "Driver Registration");
+    setTxt("drv-modal-title", isEdit ? `แก้ไขข้อมูลพนักงาน: ${driver.name}` : "เพิ่มพนักงานขับรถใหม่");
+    setTxt("drv-status-label", isEdit ? "สถานะพนักงาน" : "สถานะเริ่มต้น");
+    setTxt("btn-submit-driver", isEdit ? "บันทึกการแก้ไข" : "ยืนยันเพิ่มพนักงาน");
+
+    const btnDel = document.getElementById("btn-delete-driver");
+    if (btnDel) btnDel.classList.toggle("hidden", !isEdit);
+  },
+
   openNewDriverModal() {
     const modal = document.getElementById("modal-new-driver");
     if (!modal) return;
 
-    const drivers = window.store.getDrivers();
-    const vehicles = window.store.getVehicles();
+    this.editingDriverId = null;
+    this._configureDriverModalChrome(null);
 
-    // Reset form fields cleanly
+    const drivers = window.store.getDrivers();
     const elName = document.getElementById("drv-name");
     if (elName) elName.value = "";
     const elPhone = document.getElementById("drv-phone");
@@ -1090,16 +1302,42 @@ const App = {
     const elStatus = document.getElementById("drv-status");
     if (elStatus) elStatus.value = "ready";
 
-    const selPlate = document.getElementById("drv-vehicle-plate");
-    if (selPlate) {
-      selPlate.innerHTML =
-        `<option value="สำรอง (รอจัดรถ)">พนักงานขับรถสำรอง (ยังไม่ระบุรถประจำ)</option>` +
-        `<option value="__NEW__">➕ + เพิ่มรถบรรทุกคันใหม่...</option>` +
-        vehicles.map(v => `<option value="${v.plate}">${v.plate} (${v.brand} ${v.model})</option>`).join("");
-      selPlate.onchange = () => this._syncInlineNewVehicleVisibility();
-      selPlate.value = "สำรอง (รอจัดรถ)";
+    this._populateDriverVehicleSelect("สำรอง (รอจัดรถ)");
+
+    modal.classList.remove("hidden");
+    if (elName) elName.focus();
+  },
+
+  openEditDriverModal(driverId) {
+    const modal = document.getElementById("modal-new-driver");
+    const d = window.store.getDriver(driverId);
+    if (!modal || !d) return;
+
+    this.editingDriverId = d.id;
+    this._configureDriverModalChrome(d);
+
+    const elName = document.getElementById("drv-name");
+    if (elName) elName.value = d.name || "";
+    const elPhone = document.getElementById("drv-phone");
+    if (elPhone) elPhone.value = d.phone || "";
+    const elExp = document.getElementById("drv-exp-years");
+    if (elExp) elExp.value = String(d.expYears ?? 1);
+    const elLicType = document.getElementById("drv-license-type");
+    if (elLicType) {
+      if (!Array.from(elLicType.options).some(o => o.value === d.licenseType)) {
+        const opt = document.createElement("option");
+        opt.value = d.licenseType;
+        opt.textContent = d.licenseType;
+        elLicType.appendChild(opt);
+      }
+      elLicType.value = d.licenseType;
     }
-    this._syncInlineNewVehicleVisibility();
+    const elLicNo = document.getElementById("drv-license-no");
+    if (elLicNo) elLicNo.value = d.licenseNo || "";
+    const elStatus = document.getElementById("drv-status");
+    if (elStatus) elStatus.value = d.status || "ready";
+
+    this._populateDriverVehicleSelect(d.vehiclePlate || "สำรอง (รอจัดรถ)");
 
     modal.classList.remove("hidden");
     if (elName) elName.focus();
@@ -1108,6 +1346,7 @@ const App = {
   closeNewDriverModal() {
     const modal = document.getElementById("modal-new-driver");
     if (modal) modal.classList.add("hidden");
+    this.editingDriverId = null;
   },
 
   submitNewDriver() {
@@ -1139,13 +1378,40 @@ const App = {
       if (!vehicleData) return;
     }
 
+    const safeExp = isNaN(expYears) ? 1 : expYears;
+
+    if (this.editingDriverId) {
+      const driverId = this.editingDriverId;
+      let finalPlate = plateChoice;
+      if (vehicleData) {
+        const newVeh = window.store.addVehicle({
+          ...vehicleData,
+          driverId,
+          status: (status === "leave" || status === "offline") ? "idle" : "ready"
+        });
+        finalPlate = newVeh.plate;
+      }
+      const updated = window.store.updateDriver(driverId, {
+        name,
+        phone,
+        licenseNo,
+        licenseType,
+        expYears: safeExp,
+        vehiclePlate: finalPlate,
+        status
+      });
+      this.closeNewDriverModal();
+      this.showToast(`บันทึกข้อมูลพนักงาน "${updated?.name || name}" สำเร็จ`, "success");
+      return;
+    }
+
     const assignedPlate = vehicleData ? vehicleData.plate : plateChoice;
     const newDriver = window.store.addDriver({
       name,
       phone,
       licenseNo,
       licenseType,
-      expYears: isNaN(expYears) ? 1 : expYears,
+      expYears: safeExp,
       vehiclePlate: assignedPlate,
       status
     });
@@ -1159,31 +1425,73 @@ const App = {
       this.closeNewDriverModal();
       this.showToast(`เพิ่มพนักงาน "${newDriver.name}" และรถ "${newVehicle.plate}" (${newVehicle.brand} ${newVehicle.model}) สำเร็จ`, "success");
     } else {
-      // If picking an existing unassigned truck, link driverId cleanly
-      const existingTruck = window.store.getVehicle(assignedPlate);
-      if (existingTruck && !existingTruck.driverId) {
-        existingTruck.driverId = newDriver.id;
-        window.store.saveState();
-      }
       this.closeNewDriverModal();
       this.showToast(`เพิ่มพนักงานขับรถ "${newDriver.name}" (${newDriver.id}) สำเร็จ`, "success");
     }
+  },
+
+  deleteDriverFromModal() {
+    if (!this.editingDriverId) return;
+    const d = window.store.getDriver(this.editingDriverId);
+    const label = d ? `${d.name} (${d.id})` : this.editingDriverId;
+    if (!confirm(`ยืนยันลบพนักงานขับรถ "${label}" ออกจากระบบหรือไม่?`)) return;
+
+    const res = window.store.deleteDriver(this.editingDriverId);
+    if (!res.ok) {
+      this.showToast(res.reason, "error");
+      return;
+    }
+    this.closeNewDriverModal();
+    this.showToast(`ลบพนักงาน "${label}" ออกจากระบบแล้ว`, "success");
+  },
+
+  _configureVehicleModalChrome(vehicle = null) {
+    const isEdit = Boolean(vehicle);
+    const setTxt = (id, txt) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = txt;
+    };
+    setTxt("veh-modal-subtitle", isEdit ? `Edit Vehicle (${vehicle.id})` : "Fleet Registration");
+    setTxt("veh-modal-title", isEdit ? `แก้ไขข้อมูลรถ ${vehicle.plate}` : "เพิ่มรถบรรทุกเข้ากองรถ");
+    setTxt("veh-status-label", isEdit ? "สถานะรถ" : "สถานะรถเริ่มต้น");
+    setTxt("btn-submit-vehicle", isEdit ? "บันทึกการแก้ไข" : "ยืนยันเพิ่มรถบรรทุก");
+
+    const btnDel = document.getElementById("btn-delete-vehicle");
+    if (btnDel) btnDel.classList.toggle("hidden", !isEdit);
   },
 
   openNewVehicleModal() {
     const modal = document.getElementById("modal-new-vehicle");
     if (!modal) return;
 
-    this._initVehicleFormFields("veh-new");
+    this.editingVehicleId = null;
+    this._configureVehicleModalChrome(null);
+    this._initVehicleFormFields("veh-new", null);
+    this._populateVehicleDriverSelect("");
 
-    const selDrv = document.getElementById("veh-new-driver");
-    if (selDrv) {
-      const drivers = window.store.getDrivers();
-      selDrv.innerHTML = `<option value="">ยังไม่ระบุคนขับประจำ</option>` +
-        drivers.map(d => `<option value="${d.id}">${d.name} (${d.vehiclePlate})</option>`).join("");
-    }
     const elStatus = document.getElementById("veh-new-status");
     if (elStatus) elStatus.value = "ready";
+
+    modal.classList.remove("hidden");
+    const elPlate = document.getElementById("veh-new-plate");
+    if (elPlate) elPlate.focus();
+  },
+
+  openEditVehicleModal(vehicleId) {
+    const modal = document.getElementById("modal-new-vehicle");
+    const v = window.store.getVehicle(vehicleId);
+    if (!modal || !v) return;
+
+    this.editingVehicleId = v.id;
+    this._configureVehicleModalChrome(v);
+    this._initVehicleFormFields("veh-new", v);
+    this._populateVehicleDriverSelect(v.driverId || "");
+
+    const elStatus = document.getElementById("veh-new-status");
+    if (elStatus) {
+      const normalized = (v.status === "idle") ? "ready" : v.status;
+      elStatus.value = Array.from(elStatus.options).some(o => o.value === normalized) ? normalized : "ready";
+    }
 
     modal.classList.remove("hidden");
     const elPlate = document.getElementById("veh-new-plate");
@@ -1193,14 +1501,26 @@ const App = {
   closeNewVehicleModal() {
     const modal = document.getElementById("modal-new-vehicle");
     if (modal) modal.classList.add("hidden");
+    this.editingVehicleId = null;
   },
 
   submitNewVehicle() {
-    const vehicleData = this._readAndValidateVehicleForm("veh-new");
+    const vehicleData = this._readAndValidateVehicleForm("veh-new", this.editingVehicleId);
     if (!vehicleData) return;
 
     const driverId = document.getElementById("veh-new-driver")?.value || "";
     const status = document.getElementById("veh-new-status")?.value || "ready";
+
+    if (this.editingVehicleId) {
+      const updated = window.store.updateVehicle(this.editingVehicleId, {
+        ...vehicleData,
+        driverId,
+        status
+      });
+      this.closeNewVehicleModal();
+      this.showToast(`บันทึกข้อมูลรถ "${updated?.plate || vehicleData.plate}" สำเร็จ`, "success");
+      return;
+    }
 
     const newVehicle = window.store.addVehicle({
       ...vehicleData,
@@ -1208,16 +1528,27 @@ const App = {
       status
     });
 
-    if (driverId) {
-      const drv = window.store.getDriver(driverId);
-      if (drv) {
-        drv.vehiclePlate = newVehicle.plate;
-        window.store.saveState();
-      }
-    }
-
     this.closeNewVehicleModal();
     this.showToast(`เพิ่มรถบรรทุก "${newVehicle.plate}" (${newVehicle.brand} ${newVehicle.model}) เข้ากองรถสำเร็จ`, "success");
+  },
+
+  deleteVehicleFromModal() {
+    if (!this.editingVehicleId) return;
+    const vehicleId = this.editingVehicleId;
+    const v = window.store.getVehicle(vehicleId);
+    const label = v ? `${v.plate} (${v.id})` : vehicleId;
+    if (!confirm(`ยืนยันลบรถบรรทุก "${label}" ออกจากกองรถหรือไม่?`)) return;
+
+    const res = window.store.deleteVehicle(vehicleId);
+    if (!res.ok) {
+      this.showToast(res.reason, "error");
+      return;
+    }
+    if (this.selectedDetailVehicleId === vehicleId) {
+      this.closeVehicleDetailModal();
+    }
+    this.closeNewVehicleModal();
+    this.showToast(`ลบรถบรรทุก "${label}" ออกจากกองรถแล้ว`, "success");
   },
 
   /* =====================================================================
@@ -1228,6 +1559,7 @@ const App = {
     if (!modal) return;
 
     this.selectedDetailVehicleId = vehicleId;
+    this._lastDetailStepKey = null;
 
     // Populate quick vehicle switcher dropdown
     const sel = document.getElementById("vd-vehicle-select");
@@ -1239,6 +1571,7 @@ const App = {
       `).join("");
       sel.onchange = (e) => {
         this.selectedDetailVehicleId = e.target.value;
+        this._lastDetailStepKey = null;
         this.renderVehicleDetailModalData(e.target.value, false);
       };
     }
@@ -1254,16 +1587,33 @@ const App = {
 
     this.renderVehicleDetailModalData(vehicleId, false);
     setTimeout(() => {
-      if (this.mapManagers.vehicleDetail?.map) {
-        this.mapManagers.vehicleDetail.map.invalidateSize();
+      if (this.selectedDetailVehicleId !== vehicleId) return;
+      const mgr = this.mapManagers.vehicleDetail;
+      if (mgr?.map) {
+        mgr.map.invalidateSize({ animate: false });
+        const v = window.store.getVehicle(vehicleId);
+        if (v) {
+          const jobs = window.store.getJobs();
+          const activeJob = jobs.find(j => j.vehicleId === v.id && !window.store.isJobCompleted(j));
+          const job = activeJob || jobs.find(j => j.vehicleId === v.id) || null;
+          const pLoc = job ? window.store.getLocation(job.pickupLocId) : null;
+          const dLoc = job ? window.store.getLocation(job.dropoffLocId) : null;
+          mgr.renderSingleVehicleFocus(v, job, pLoc, dLoc);
+        }
       }
-    }, 80);
+    }, 90);
   },
 
   closeVehicleDetailModal() {
     const modal = document.getElementById("modal-vehicle-detail");
     if (modal) modal.classList.add("hidden");
     this.selectedDetailVehicleId = null;
+    this._lastDetailStepKey = null;
+  },
+
+  openJobFromVehicleDetail(jobId) {
+    this.closeVehicleDetailModal();
+    this.openJobInTracker(jobId);
   },
 
   renderVehicleDetailModalData(vehicleId, liveTickOnly = false) {
@@ -1279,16 +1629,7 @@ const App = {
     const latestCompletedJob = !activeJob ? jobs.find(j => j.vehicleId === v.id) : null;
     const job = activeJob || latestCompletedJob || null;
 
-    const vStatusMap = {
-      running: { cls: "bg-emerald-100 text-emerald-700", label: "กำลังวิ่งส่งสินค้า" },
-      resting: { cls: "bg-amber-100 text-amber-800", label: "จอดพัก / ด่านตรวจ" },
-      idle: { cls: "bg-blue-100 text-blue-700", label: "พร้อมรับงาน" },
-      ready: { cls: "bg-blue-100 text-blue-700", label: "พร้อมรับงาน" },
-      assigned: { cls: "bg-purple-100 text-purple-700", label: "รอออกเดินทาง" },
-      maintenance: { cls: "bg-rose-100 text-rose-700", label: "ตรวจเช็คสภาพ" },
-      offline: { cls: "bg-slate-100 text-slate-600", label: "ออฟไลน์" }
-    };
-    const vBadge = vStatusMap[v.status] || { cls: "bg-slate-100 text-slate-700", label: v.status };
+    const vBadge = this.VEHICLE_STATUS_MAP[v.status] || { cls: "bg-slate-100 text-slate-700", label: v.status };
 
     const setEl = (id, text) => {
       const el = document.getElementById(id);
@@ -1317,17 +1658,24 @@ const App = {
     setEl("vd-rem-dist", activeJob && liveEst ? `~${liveEst.remainingDistKm} กม.` : (activeJob ? `${activeJob.routeDistanceKm || "-"} กม.` : "-"));
     setEl("vd-live-eta", activeJob && liveEst ? liveEst.liveEtaTimeOnly : (activeJob?.eta || "-"));
 
-    // Map update
+    // Map update (smoothly updates marker + route polylines without resetting zoom on live tick)
     const mgr = this.mapManagers.vehicleDetail;
     if (mgr && mgr.map) {
       if (liveTickOnly && mgr.markers[v.id]) {
-        mgr.markers[v.id].setLatLng([v.lat, v.lng]);
+        mgr.updateSingleVehicleFocusPosition(v, job, pLoc, dLoc);
       } else {
         mgr.renderSingleVehicleFocus(v, job, pLoc, dLoc);
       }
     }
 
-    if (liveTickOnly && !activeJob) return;
+    // Avoid rebuilding driver/job/timeline DOM on 4s GPS ticks unless step, job, or driver assignment changed
+    const stepKey = job
+      ? `${v.id}|${d?.id || ""}|${d?.status || ""}|${job.id}|${job.currentStatusId}|${(job.timeline || []).length}`
+      : `${v.id}|${d?.id || ""}|${d?.status || ""}|no-job`;
+    if (liveTickOnly && this._lastDetailStepKey === stepKey) {
+      return;
+    }
+    this._lastDetailStepKey = stepKey;
 
     // Driver card
     if (d) {
@@ -1338,13 +1686,7 @@ const App = {
         elPhone.href = `tel:${d.phone}`;
       }
       setEl("vd-driver-license", `${d.licenseType} (${d.licenseNo}) • ${d.expYears} ปี`);
-      const dStatusMap = {
-        on_duty: { cls: "bg-emerald-100 text-emerald-700", label: "ปฏิบัติงาน" },
-        ready: { cls: "bg-blue-100 text-blue-700", label: "พร้อมใช้งาน" },
-        leave: { cls: "bg-amber-100 text-amber-800", label: "ลางาน" },
-        offline: { cls: "bg-slate-100 text-slate-600", label: "ออฟไลน์" }
-      };
-      const dBadge = dStatusMap[d.status] || { cls: "bg-slate-100 text-slate-700", label: d.status };
+      const dBadge = this.DRIVER_STATUS_MAP[d.status] || { cls: "bg-slate-100 text-slate-700", label: d.status };
       const elDrvStatus = document.getElementById("vd-driver-status");
       if (elDrvStatus) {
         elDrvStatus.className = `px-2 py-0.5 rounded-full text-[10px] font-bold ${dBadge.cls}`;
@@ -1362,6 +1704,7 @@ const App = {
     const jobHeading = document.getElementById("vd-job-heading");
     const jobTypeBadge = document.getElementById("vd-job-type-badge");
     const jobBody = document.getElementById("vd-job-body");
+    const jobActions = document.getElementById("vd-job-actions");
     const stepBadge = document.getElementById("vd-status-step-badge");
     const stepsContainer = document.getElementById("vd-status-steps");
 
@@ -1373,6 +1716,10 @@ const App = {
       }
       if (jobBody) {
         jobBody.innerHTML = `<div class="p-3 bg-slate-50 rounded-xl text-slate-500 text-center">รถคันนี้ยังไม่มีงานขนส่งในรอบปัจจุบัน</div>`;
+      }
+      if (jobActions) {
+        jobActions.classList.add("hidden");
+        jobActions.innerHTML = "";
       }
       if (stepBadge) stepBadge.textContent = "-";
       if (stepsContainer) {
@@ -1410,6 +1757,18 @@ const App = {
       `;
     }
 
+    if (jobActions) {
+      jobActions.classList.remove("hidden");
+      jobActions.innerHTML = `
+        <button type="button" onclick="App.openMilestonesModal('${job.id}')" class="flex-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl text-[11px] font-bold transition text-center">
+          🕒 ดูแผนเวลา / จุดพักรถ
+        </button>
+        <button type="button" onclick="App.openJobFromVehicleDetail('${job.id}')" class="flex-1 px-3 py-1.5 bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white border border-blue-200 rounded-xl text-[11px] font-bold transition text-center">
+          เปิดหน้าติดตามสถานะงาน &rarr;
+        </button>
+      `;
+    }
+
     if (stepBadge) {
       stepBadge.textContent = `ขั้นที่ ${job.currentStatusId}/${flow.length}: ${currentMeta.name}`;
     }
@@ -1444,44 +1803,248 @@ const App = {
   /* =====================================================================
      7. History & Reports Render (สไลด์ 13)
   ===================================================================== */
+  _getCompletedJobCompletionTime(job) {
+    const targetId = job.isCrossBorder ? 8 : 7;
+    const timeline = job.timeline || [];
+    const exactLog = timeline.find(t => t.statusId === targetId) || timeline[timeline.length - 1];
+    return exactLog?.time ? `${exactLog.time} น.` : (job.eta || "-");
+  },
+
+  _getFilteredCompletedJobs() {
+    const query = (document.getElementById("history-search-input")?.value || "").trim().toLowerCase();
+    const typeFilter = document.getElementById("history-type-filter")?.value || "all";
+
+    const allCompleted = window.store.getJobs()
+      .filter(j => window.store.isJobCompleted(j))
+      .sort((a, b) => {
+        const dCmp = (b.departureDate || "").localeCompare(a.departureDate || "");
+        return dCmp !== 0 ? dCmp : b.id.localeCompare(a.id);
+      })
+      .map(j => ({
+        job: j,
+        cust: window.store.getCustomer(j.customerId) || { name: "-" },
+        v: window.store.getVehicle(j.vehicleId) || { plate: "-" },
+        d: window.store.getDriver(j.driverId) || { name: "-" },
+        pLoc: window.store.getLocation(j.pickupLocId) || { name: "-", province: "-" },
+        dLoc: window.store.getLocation(j.dropoffLocId) || { name: "-", province: "-" },
+        completedTime: this._getCompletedJobCompletionTime(j)
+      }));
+
+    const filteredRows = allCompleted.filter(r => {
+      const j = r.job;
+      if (typeFilter === "domestic" && j.isCrossBorder) return false;
+      if (typeFilter === "cross_border" && !j.isCrossBorder) return false;
+      if (!query) return true;
+
+      const haystacks = [
+        j.id, j.code, r.cust.name, j.productType, j.productQty,
+        r.pLoc.name, r.pLoc.province, r.dLoc.name, r.dLoc.province,
+        r.v.plate, r.d.name
+      ];
+      return haystacks.some(txt => (txt || "").toLowerCase().includes(query));
+    });
+
+    return { allCompleted, filteredRows, query, typeFilter };
+  },
+
+  resetHistoryFilters() {
+    const searchEl = document.getElementById("history-search-input");
+    const typeEl = document.getElementById("history-type-filter");
+    if (searchEl) searchEl.value = "";
+    if (typeEl) typeEl.value = "all";
+    this.renderHistoryReports();
+  },
+
+  _summarizeDeliveredQuantities(rows) {
+    let liters = 0;
+    let tons = 0;
+    let others = 0;
+
+    rows.forEach(r => {
+      const raw = String(r.job.productQty || "").trim();
+      const numMatch = raw.replace(/,/g, "").match(/\d+(\.\d+)?/);
+      const val = numMatch ? parseFloat(numMatch[0]) : 0;
+      if (!val) return;
+
+      if (/ตัน|\btons?\b|\bt\b/i.test(raw)) {
+        tons += val;
+      } else if (/ลิตร|\bliters?\b|\blitres?\b|\bl\b/i.test(raw)) {
+        liters += val;
+      } else {
+        others += val;
+      }
+    });
+
+    const fmt = (n) => Number.isInteger(n)
+      ? n.toLocaleString("en-US")
+      : n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+
+    const parts = [];
+    if (liters > 0) parts.push(`${fmt(liters)} ลิตร`);
+    if (tons > 0) parts.push(`${fmt(tons)} ตัน`);
+    if (others > 0) parts.push(`${fmt(others)} หน่วย`);
+
+    const headline = parts.length > 0 ? parts.join(" • ") : "0 ลิตร";
+    const subtext = `น้ำมัน ${fmt(liters)} ลิตร • ก๊าซ ${fmt(tons)} ตัน${others > 0 ? ` • อื่นๆ ${fmt(others)}` : ""}`;
+    return { headline, subtext };
+  },
+
   renderHistoryReports() {
-    const jobs = window.store.getJobs();
+    const { allCompleted, filteredRows, query, typeFilter } = this._getFilteredCompletedJobs();
+    const isFiltered = Boolean(query || typeFilter !== "all");
+
+    const volSummary = this._summarizeDeliveredQuantities(filteredRows);
+    const domCount = filteredRows.filter(r => !r.job.isCrossBorder).length;
+    const cbCount = filteredRows.filter(r => r.job.isCrossBorder).length;
+
+    const setTxt = (id, txt) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = txt;
+    };
+    setTxt("rep-total-completed", `${allCompleted.length} งาน`);
+    setTxt("rep-filtered-count", isFiltered ? `ตรงตามตัวกรอง ${filteredRows.length} จาก ${allCompleted.length} งาน` : "แสดงเฉพาะงานที่ปิดรอบสมบูรณ์แล้ว");
+    const volEl = document.getElementById("rep-total-volume");
+    if (volEl) {
+      volEl.textContent = volSummary.headline;
+      volEl.className = `${volSummary.headline.includes("•") ? "text-xl" : "text-2xl"} font-black text-blue-700 mt-1 font-mono`;
+    }
+    setTxt("rep-volume-breakdown", volSummary.subtext);
+    setTxt("rep-route-breakdown", `🇹🇭 ในประเทศ ${domCount} • 🌐 ข้ามแดน ${cbCount}`);
+    setTxt("history-filter-summary", isFiltered ? `แสดง ${filteredRows.length}/${allCompleted.length} รายการ` : "");
+
+    const btnExport = document.getElementById("btn-export-history-csv");
+    if (btnExport) btnExport.disabled = filteredRows.length === 0;
+
     const tableBody = document.getElementById("history-jobs-table-body");
     if (!tableBody) return;
 
-    tableBody.innerHTML = jobs.map(j => {
-      const cust = window.store.getCustomer(j.customerId) || { name: "-" };
-      const v = window.store.getVehicle(j.vehicleId) || { plate: "-" };
-      const d = window.store.getDriver(j.driverId) || { name: "-" };
-      const pLoc = window.store.getLocation(j.pickupLocId) || { name: "-" };
-      const dLoc = window.store.getLocation(j.dropoffLocId) || { name: "-" };
-      const status = window.store.getStatusMeta(j.currentStatusId, j) || { name: j.currentStatusKey, key: "pending" };
+    if (allCompleted.length === 0) {
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="8" class="py-10 px-4 text-center text-xs text-slate-500">
+            ยังไม่มีงานขนส่งที่เสร็จสิ้นแล้ว (เมื่อคนขับอัปเดตขั้นตอนสุดท้าย รายการรายงานจะแสดงที่นี่อัตโนมัติ)
+          </td>
+        </tr>
+      `;
+      return;
+    }
 
+    if (filteredRows.length === 0) {
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="8" class="py-10 px-4 text-center text-xs text-slate-500 space-y-2">
+            <div>ไม่พบรายงานงานที่ตรงกับเงื่อนไขการค้นหา</div>
+            <button type="button" onclick="App.resetHistoryFilters()" class="px-3 py-1.5 bg-slate-100 hover:bg-blue-50 text-blue-600 border border-slate-200 rounded-lg font-bold">
+              ล้างตัวกรองทั้งหมด
+            </button>
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tableBody.innerHTML = filteredRows.map(r => {
+      const j = r.job;
       return `
         <tr class="hover:bg-slate-50 border-b border-slate-100 text-xs">
-          <td class="py-3 px-4 font-mono font-bold text-blue-700">
-            ${j.id}
-            ${j.isCrossBorder ? '<span class="ml-1 px-1.5 py-0.2 rounded text-[10px] bg-purple-100 text-purple-700 font-bold border border-purple-200">ข้ามแดน</span>' : ''}
+          <td class="py-3 px-4 font-mono font-bold text-blue-700 align-top">
+            <div>${j.id}</div>
+            ${j.isCrossBorder
+              ? '<span class="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] bg-purple-100 text-purple-700 font-sans font-bold border border-purple-200">🌐 ข้ามแดน</span>'
+              : '<span class="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] bg-slate-100 text-slate-600 font-sans font-semibold">ในประเทศ</span>'}
           </td>
-          <td class="py-3 px-4 text-slate-600">${j.departureDate || "-"}</td>
-          <td class="py-3 px-4 font-medium text-slate-800">${cust.name}</td>
-          <td class="py-3 px-4 text-slate-600">${pLoc.name}</td>
-          <td class="py-3 px-4 text-slate-600">${dLoc.name}</td>
-          <td class="py-3 px-4 font-mono font-bold text-slate-700">${v.plate}</td>
-          <td class="py-3 px-4 text-slate-600">${d.name}</td>
-          <td class="py-3 px-4">
-            <span class="px-2.5 py-1 text-[11px] font-bold rounded-full badge-status-${status.key}">
-              ${status.name}
+          <td class="py-3 px-4 align-top">
+            <div class="text-slate-700 font-medium font-mono">${j.departureDate || "-"}</div>
+            <span class="inline-block mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
+              ✓ เสร็จสิ้น ${r.completedTime}
             </span>
           </td>
-          <td class="py-3 px-4 text-right">
-            <button onclick="App.openJobInTracker('${j.id}')" class="text-blue-600 hover:underline font-semibold">
-              ดูประวัติไทม์ไลน์
+          <td class="py-3 px-4 font-medium text-slate-800 align-top">${r.cust.name}</td>
+          <td class="py-3 px-4 text-slate-600 align-top">
+            <div class="font-medium text-slate-800">${r.pLoc.province || "-"} &rarr; ${r.dLoc.province || "-"}</div>
+            <div class="text-[11px] text-slate-400 truncate max-w-[230px]" title="${r.pLoc.name} -> ${r.dLoc.name}">${r.pLoc.name} &rarr; ${r.dLoc.name}</div>
+          </td>
+          <td class="py-3 px-4 align-top">
+            <div class="font-semibold text-indigo-700">${j.productType || "-"}</div>
+            <div class="text-[11px] text-slate-500">${j.productQty || "-"}</div>
+          </td>
+          <td class="py-3 px-4 text-right font-mono font-bold text-slate-800 align-top">
+            ${j.routeDistanceKm ? `${j.routeDistanceKm} กม.` : "-"}
+          </td>
+          <td class="py-3 px-4 align-top">
+            <div class="font-mono font-bold text-slate-800">${r.v.plate}</div>
+            <div class="text-[11px] text-slate-500">${r.d.name}</div>
+          </td>
+          <td class="py-3 px-4 text-right align-top whitespace-nowrap">
+            <button type="button" onclick="App.openJobInTracker('${j.id}')" class="text-blue-600 hover:underline font-semibold">
+              ดูไทม์ไลน์ &rarr;
             </button>
           </td>
         </tr>
       `;
     }).join("");
+  },
+
+  exportCompletedJobsCsv() {
+    const { filteredRows } = this._getFilteredCompletedJobs();
+    if (filteredRows.length === 0) {
+      this.showToast("ไม่มีข้อมูลงานที่เสร็จสิ้นสำหรับส่งออก", "error");
+      return;
+    }
+
+    const esc = (val) => `"${String(val ?? "").replace(/"/g, '""')}"`;
+    const headers = [
+      "เลขงาน",
+      "รหัสอ้างอิง",
+      "ประเภทเส้นทาง",
+      "วันที่เริ่มงาน",
+      "เวลาปิดงาน",
+      "ลูกค้า",
+      "จุดรับสินค้า",
+      "จังหวัดต้นทาง",
+      "จุดส่งสินค้า",
+      "จังหวัดปลายทาง",
+      "สินค้า",
+      "ปริมาณ",
+      "ระยะทาง(กม.)",
+      "ทะเบียนรถ",
+      "คนขับ"
+    ];
+
+    const lines = [headers.map(esc).join(",")];
+    filteredRows.forEach(r => {
+      const j = r.job;
+      lines.push([
+        j.id,
+        j.code,
+        j.isCrossBorder ? "ข้ามแดน" : "ในประเทศ",
+        j.departureDate || "-",
+        r.completedTime,
+        r.cust.name,
+        r.pLoc.name,
+        r.pLoc.province || "-",
+        r.dLoc.name,
+        r.dLoc.province || "-",
+        j.productType || "-",
+        j.productQty || "-",
+        j.routeDistanceKm || 0,
+        r.v.plate,
+        r.d.name
+      ].map(esc).join(","));
+    });
+
+    const bom = "\uFEFF";
+    const blob = new Blob([bom + lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const today = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `NextRoute-Completed-Jobs-${today}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    this.showToast(`ส่งออกรายงาน ${filteredRows.length} งานสำเร็จแล้ว`, "success");
   },
 
   /* =====================================================================

@@ -255,34 +255,188 @@ class AppStore {
     return newJob;
   }
 
+  _nextSeqId(items, prefix, pad = 2) {
+    let maxNum = 0;
+    items.forEach(item => {
+      const m = String(item.id || "").match(new RegExp(`^${prefix}-(\\d+)$`));
+      if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10));
+    });
+    return `${prefix}-${String(maxNum + 1).padStart(pad, "0")}`;
+  }
+
+  /**
+   * Maintain strict 1-to-1 driver <-> vehicle assignment without duplicate links
+   */
+  assignDriverToVehicle(vehicleId, driverId) {
+    const vehicles = this.getVehicles();
+    const drivers = this.getDrivers();
+    const targetVehicle = vehicleId ? this.getVehicle(vehicleId) : null;
+    const targetDriver = driverId ? this.getDriver(driverId) : null;
+
+    // Detach targetDriver from any previous truck
+    if (targetDriver) {
+      vehicles.forEach(v => {
+        if (v.driverId === targetDriver.id && (!targetVehicle || v.id !== targetVehicle.id)) {
+          v.driverId = "";
+        }
+      });
+    }
+
+    // Detach any old driver that previously pointed to targetVehicle
+    if (targetVehicle) {
+      drivers.forEach(d => {
+        if (d.vehiclePlate === targetVehicle.plate && (!targetDriver || d.id !== targetDriver.id)) {
+          d.vehiclePlate = "สำรอง (รอจัดรถ)";
+        }
+      });
+      targetVehicle.driverId = targetDriver ? targetDriver.id : "";
+    }
+
+    if (targetDriver) {
+      targetDriver.vehiclePlate = targetVehicle ? targetVehicle.plate : "สำรอง (รอจัดรถ)";
+    }
+  }
+
   addVehicle(vehicleData) {
     const vehicles = this.getVehicles();
-    const newId = `V-${String(vehicles.length + 1).padStart(2, "0")}`;
+    const newId = this._nextSeqId(vehicles, "V", 2);
     const newV = {
       id: newId,
       ...vehicleData,
+      driverId: "",
       lat: vehicleData.lat || 13.3611,
       lng: vehicleData.lng || 100.9847,
-      speed: 0,
+      speed: vehicleData.status === "running" ? (vehicleData.speed || 65) : 0,
       fuelLevel: 100,
       lastUpdate: "เพิ่งเพิ่ม"
     };
     this.state.vehicles.push(newV);
+    if (vehicleData.driverId) {
+      this.assignDriverToVehicle(newV.id, vehicleData.driverId);
+    }
     this.saveState();
     return newV;
   }
 
+  updateVehicle(vehicleId, updates) {
+    const v = this.getVehicle(vehicleId);
+    if (!v) return null;
+
+    const oldPlate = v.plate;
+    if (updates.plate !== undefined) v.plate = updates.plate;
+    if (updates.brand !== undefined) v.brand = updates.brand;
+    if (updates.model !== undefined) v.model = updates.model;
+    if (updates.type !== undefined) v.type = updates.type;
+    if (updates.capacity !== undefined) v.capacity = updates.capacity;
+    if (updates.status !== undefined) {
+      v.status = updates.status;
+      if (updates.status !== "running") v.speed = 0;
+      else if (v.speed === 0) v.speed = 65;
+    }
+
+    // Sync renamed plate for currently linked driver before reassigning
+    if (updates.plate && updates.plate !== oldPlate) {
+      this.getDrivers().forEach(d => {
+        if (d.vehiclePlate === oldPlate) d.vehiclePlate = updates.plate;
+      });
+    }
+
+    if (updates.driverId !== undefined) {
+      this.assignDriverToVehicle(v.id, updates.driverId);
+    }
+
+    v.lastUpdate = "อัปเดตเมื่อสักครู่";
+    this.saveState();
+    return v;
+  }
+
+  deleteVehicle(vehicleId) {
+    const v = this.getVehicle(vehicleId);
+    if (!v) return { ok: false, reason: "ไม่พบข้อมูลรถคันนี้" };
+
+    const activeJob = this.getJobs().find(j => j.vehicleId === v.id && !this.isJobCompleted(j));
+    if (activeJob) {
+      return { ok: false, reason: `รถ ${v.plate} กำลังปฏิบัติงาน ${activeJob.id} อยู่ ไม่สามารถลบได้` };
+    }
+
+    this.getDrivers().forEach(d => {
+      if (d.vehiclePlate === v.plate) d.vehiclePlate = "สำรอง (รอจัดรถ)";
+    });
+    this.state.vehicles = this.state.vehicles.filter(item => item.id !== v.id);
+    this.saveState();
+    return { ok: true };
+  }
+
   addDriver(driverData) {
     const drivers = this.getDrivers();
-    const newId = `D-${String(drivers.length + 1).padStart(2, "0")}`;
+    const newId = this._nextSeqId(drivers, "D", 2);
     const newD = {
       id: newId,
       ...driverData,
+      vehiclePlate: "สำรอง (รอจัดรถ)",
       status: driverData.status || "ready"
     };
     this.state.drivers.push(newD);
+
+    if (driverData.vehiclePlate && driverData.vehiclePlate !== "สำรอง (รอจัดรถ)") {
+      const targetV = this.getVehicle(driverData.vehiclePlate);
+      if (targetV) {
+        this.assignDriverToVehicle(targetV.id, newD.id);
+      } else {
+        newD.vehiclePlate = driverData.vehiclePlate;
+      }
+    }
+
     this.saveState();
     return newD;
+  }
+
+  updateDriver(driverId, updates) {
+    const d = this.getDriver(driverId);
+    if (!d) return null;
+
+    if (updates.name !== undefined) d.name = updates.name;
+    if (updates.phone !== undefined) d.phone = updates.phone;
+    if (updates.licenseNo !== undefined) d.licenseNo = updates.licenseNo;
+    if (updates.licenseType !== undefined) d.licenseType = updates.licenseType;
+    if (updates.expYears !== undefined) d.expYears = updates.expYears;
+    if (updates.status !== undefined) d.status = updates.status;
+
+    if (updates.vehiclePlate !== undefined) {
+      if (!updates.vehiclePlate || updates.vehiclePlate === "สำรอง (รอจัดรถ)") {
+        this.getVehicles().forEach(v => {
+          if (v.driverId === d.id) v.driverId = "";
+        });
+        d.vehiclePlate = "สำรอง (รอจัดรถ)";
+      } else {
+        const targetV = this.getVehicle(updates.vehiclePlate);
+        if (targetV) {
+          this.assignDriverToVehicle(targetV.id, d.id);
+        } else {
+          d.vehiclePlate = updates.vehiclePlate;
+        }
+      }
+    }
+
+    this.saveState();
+    return d;
+  }
+
+  deleteDriver(driverId) {
+    const d = this.getDriver(driverId);
+    if (!d) return { ok: false, reason: "ไม่พบข้อมูลพนักงานคนนี้" };
+
+    const activeJob = this.getJobs().find(j => j.driverId === d.id && !this.isJobCompleted(j));
+    if (activeJob) {
+      return { ok: false, reason: `${d.name} กำลังปฏิบัติงาน ${activeJob.id} อยู่ ไม่สามารถลบได้` };
+    }
+
+    this.getVehicles().forEach(v => {
+      if (v.driverId === d.id) v.driverId = "";
+    });
+    this.state.drivers = this.state.drivers.filter(item => item.id !== d.id);
+    this.saveState();
+    return { ok: true };
   }
 
   addLocation(locationData) {

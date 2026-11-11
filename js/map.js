@@ -217,6 +217,8 @@ class MapManager {
     this.locationMarkers = {};
     this.routeLines.forEach(line => this.map.removeLayer(line));
     this.routeLines = [];
+    this._singleDoneLine = null;
+    this._singleRemLine = null;
     if (this.routePolyline) {
       this.map.removeLayer(this.routePolyline);
       this.routePolyline = null;
@@ -265,6 +267,8 @@ class MapManager {
           dashArray: "8, 6"
         }).addTo(this.map);
 
+        this._singleDoneLine = doneLine;
+        this._singleRemLine = remLine;
         this.routeLines.push(doneLine, remLine);
       } else {
         // Planned route line: Pickup -> Dropoff
@@ -280,6 +284,26 @@ class MapManager {
       this.map.fitBounds(boundsPoints, { padding: [50, 50], maxZoom: 12 });
     } else {
       this.map.setView([vehicle.lat, vehicle.lng], 12);
+    }
+  }
+
+  /**
+   * Smoothly update marker & route trajectory on live GPS ticks without resetting user zoom
+   */
+  updateSingleVehicleFocusPosition(vehicle, job, pLoc, dLoc) {
+    if (!this.map || !vehicle) return;
+    const vMarker = this.markers[vehicle.id];
+    if (vMarker) {
+      vMarker.setLatLng([vehicle.lat, vehicle.lng]);
+      vMarker.setPopupContent(`<div class="text-xs font-bold text-slate-800">${vehicle.plate} (${vehicle.brand} ${vehicle.model})</div><div class="text-[11px] text-blue-600">ความเร็ว: ${vehicle.speed} กม./ชม.</div>`);
+    }
+    if (job && pLoc && dLoc) {
+      if (this._singleDoneLine) {
+        this._singleDoneLine.setLatLngs([[pLoc.lat, pLoc.lng], [vehicle.lat, vehicle.lng]]);
+      }
+      if (this._singleRemLine) {
+        this._singleRemLine.setLatLngs([[vehicle.lat, vehicle.lng], [dLoc.lat, dLoc.lng]]);
+      }
     }
   }
 
