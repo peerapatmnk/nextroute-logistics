@@ -29,6 +29,7 @@ const App = {
   },
 
   init() {
+    this.updateUserHeader();
     this.bindEvents();
     this.renderActiveTab();
     this.initMaps();
@@ -41,6 +42,37 @@ const App = {
     });
 
     this.updateKPICards();
+  },
+
+  updateUserHeader() {
+    if (window.Auth) {
+      const u = window.Auth.getCurrentUser();
+      if (u) {
+        const elName = document.getElementById("header-user-name");
+        const elRole = document.getElementById("header-user-role");
+        const elAvatar = document.getElementById("header-user-avatar");
+        if (elName) elName.textContent = u.name;
+        if (elRole) elRole.textContent = u.title || "ศูนย์ควบคุม NextRoute";
+        if (elAvatar) elAvatar.textContent = u.avatar || "AD";
+      }
+    }
+  },
+
+  copyCustomerTrackingLink(jobId) {
+    const job = window.store.getJob(jobId || this.selectedJobId);
+    if (!job) return;
+    const origin = window.location.origin || "http://localhost:8080";
+    const trackingUrl = `${origin}/track.html?job=${encodeURIComponent(job.code)}`;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(trackingUrl).then(() => {
+        this.showToast(`คัดลอกลิงก์สำหรับลูกค้าเรียบร้อยแล้ว: ${job.code}`, "success");
+      }).catch(() => {
+        prompt(`คัดลอกลิงก์ด้านล่างเพื่อส่งให้ลูกค้าติดตามงาน ${job.code}:`, trackingUrl);
+      });
+    } else {
+      prompt(`คัดลอกลิงก์ด้านล่างเพื่อส่งให้ลูกค้าติดตามงาน ${job.code}:`, trackingUrl);
+    }
   },
 
   startLiveClock() {
@@ -207,6 +239,30 @@ const App = {
   ===================================================================== */
   renderDashboard() {
     const jobs = window.store.getJobs();
+
+    // Render Recent Jobs Cards Widget
+    const recentCards = document.getElementById("dashboard-recent-jobs-cards");
+    if (recentCards) {
+      recentCards.innerHTML = jobs.slice(0, 3).map(job => {
+        const v = window.store.getVehicle(job.vehicleId) || { plate: "-" };
+        const d = window.store.getDriver(job.driverId) || { name: "-" };
+        const pLoc = window.store.getLocation(job.pickupLocId) || { province: "-" };
+        const dLoc = window.store.getLocation(job.dropoffLocId) || { province: "-" };
+        const status = window.store.getStatusMeta(job.currentStatusId, job) || { name: job.currentStatusKey, key: "pending" };
+        const isCB = job.isCrossBorder;
+        return `
+          <div class="p-3 bg-slate-50 hover:bg-blue-50/50 border border-slate-100 hover:border-blue-200 rounded-xl transition cursor-pointer" onclick="App.openJobInTracker('${job.id}')">
+            <div class="flex justify-between items-center text-xs">
+              <span class="font-bold text-blue-700 font-mono">${job.id} (${job.code})</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${isCB ? 'bg-purple-100 text-purple-700' : 'bg-indigo-100 text-indigo-700'}">${status.name}</span>
+            </div>
+            <div class="text-xs font-semibold text-slate-800 mt-1">${pLoc.province} &rarr; ${dLoc.province} (${job.productType})</div>
+            <div class="text-[11px] text-slate-500 mt-0.5">${v.plate} | คนขับ: ${d.name}</div>
+          </div>
+        `;
+      }).join("");
+    }
+
     const tableBody = document.getElementById("dashboard-jobs-table-body");
     if (!tableBody) return;
 
@@ -421,27 +477,386 @@ const App = {
       }
     }
 
-    // Render Timeline Activity History
+    // Render Timeline Activity History with Proof Photos
     const timelineContainer = document.getElementById("job-timeline-list");
     if (timelineContainer && job.timeline) {
+      const catBadges = {
+        fuel: { label: "⛽ เติมน้ำมัน", bg: "bg-blue-100 text-blue-800" },
+        customs: { label: "🛂 ด่านศุลกากร", bg: "bg-purple-100 text-purple-800" },
+        seal: { label: "🔒 ซีลนิรภัย", bg: "bg-amber-100 text-amber-800" },
+        inspection: { label: "🔍 ตรวจสภาพรถ", bg: "bg-emerald-100 text-emerald-800" },
+        delivery: { label: "📝 ส่งมอบ/POD", bg: "bg-indigo-100 text-indigo-800" },
+        other: { label: "📷 รูปหลักฐาน", bg: "bg-slate-100 text-slate-800" }
+      };
+
       timelineContainer.innerHTML = job.timeline.map((entry, idx) => {
         const statusMeta = window.store.getStatusMeta(entry.statusId, job) || { name: entry.name, key: "pending" };
         const isLatest = idx === job.timeline.length - 1;
+        const photos = entry.photos || [];
 
         return `
           <div class="relative pl-6 pb-5 ${idx === job.timeline.length - 1 ? "" : "border-l-2 border-slate-200"} ml-3">
-            <div class="absolute -left-[9px] top-0 w-4 h-4 rounded-full ${isLatest ? (statusMeta.key === 'border_customs' ? 'bg-purple-600 ring-4 ring-purple-100' : 'bg-blue-600 ring-4 ring-blue-100') : 'bg-emerald-500'}"></div>
+            <div class="absolute -left-[9px] top-0 w-4 h-4 rounded-full ${entry.isReverted ? 'bg-amber-500 ring-4 ring-amber-100' : isLatest ? (statusMeta.key === 'border_customs' ? 'bg-purple-600 ring-4 ring-purple-100' : 'bg-blue-600 ring-4 ring-blue-100') : 'bg-emerald-500'}"></div>
             <div class="flex items-center justify-between text-xs">
               <span class="font-bold text-slate-800 text-sm">${entry.name}</span>
               <span class="font-mono text-slate-500 text-[11px] bg-slate-100 px-2 py-0.5 rounded">${entry.time} น.</span>
             </div>
             <div class="text-xs text-slate-600 mt-1">${entry.note}</div>
-            <div class="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
-              <span>ผู้บันทึก:</span> <span class="font-medium text-slate-500">${entry.by}</span>
+            <div class="text-[10px] text-slate-400 mt-0.5 flex items-center justify-between">
+              <div><span>ผู้บันทึก:</span> <span class="font-medium text-slate-500">${entry.by}</span></div>
+              <button type="button" onclick="App.openUploadPhotoModal('admin', ${entry.statusId})" class="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1">
+                <span>+ แนบรูปเพิ่ม</span>
+              </button>
             </div>
+
+            ${photos.length > 0 ? `
+              <div class="mt-2.5 pt-2 border-t border-slate-100">
+                <div class="flex items-center justify-between mb-1.5">
+                  <span class="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    <span>ภาพถ่ายหลักฐาน (${photos.length} รูป):</span>
+                  </span>
+                  <span class="text-[10px] text-slate-400">คลิกที่รูปเพื่อเปิดดูขนาดใหญ่</span>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                  ${photos.map((p, pIdx) => {
+                    const catInfo = catBadges[p.category] || catBadges.other;
+                    return `
+                      <div onclick="App.openPhotoViewer('${job.id}', ${entry.statusId}, ${pIdx})" class="group relative rounded-xl overflow-hidden border border-slate-200 bg-slate-900 cursor-pointer shadow-sm hover:shadow-md hover:border-blue-400 transition transform hover:-translate-y-0.5">
+                        <img src="${p.url}" alt="${p.title || 'รูปหลักฐาน'}" class="w-full h-24 object-cover group-hover:scale-105 transition duration-300">
+                        <div class="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-transparent to-transparent flex flex-col justify-between p-1.5 pointer-events-none">
+                          <span class="self-start px-1.5 py-0.5 rounded text-[9px] font-bold ${catInfo.bg} shadow-sm backdrop-blur">
+                            ${catInfo.label}
+                          </span>
+                          <div class="text-[10px] text-white truncate font-medium">
+                            ${p.title || p.caption || "ดูรูปภาพ"}
+                          </div>
+                        </div>
+                        <div class="absolute inset-0 bg-blue-600/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                          <span class="w-7 h-7 rounded-full bg-white/95 text-blue-700 flex items-center justify-center shadow text-xs font-bold">🔍</span>
+                        </div>
+                      </div>
+                    `;
+                  }).join("")}
+                </div>
+              </div>
+            ` : ''}
           </div>
         `;
       }).reverse().join("");
+    }
+  },
+
+  /* =====================================================================
+     Photo Evidence Viewer & Upload Handlers
+  ===================================================================== */
+  openPhotoViewer(jobId, statusId, photoIndex = 0) {
+    const job = window.store.getJob(jobId || this.selectedJobId);
+    if (!job) return;
+    const timelineEntry = (job.timeline || []).find(t => t.statusId === statusId);
+    if (!timelineEntry || !timelineEntry.photos || !timelineEntry.photos[photoIndex]) return;
+
+    const photo = timelineEntry.photos[photoIndex];
+    const v = window.store.getVehicle(job.vehicleId) || { plate: "-" };
+    const d = window.store.getDriver(job.driverId) || { name: "-" };
+
+    const modal = document.getElementById("modal-photo-viewer");
+    if (!modal) return;
+
+    const catBadges = {
+      fuel: { label: "⛽ เติมน้ำมัน", bg: "bg-blue-100 text-blue-800" },
+      customs: { label: "🛂 ด่านศุลกากร", bg: "bg-purple-100 text-purple-800" },
+      seal: { label: "🔒 ซีลนิรภัย", bg: "bg-amber-100 text-amber-800" },
+      inspection: { label: "🔍 ตรวจสภาพรถ", bg: "bg-emerald-100 text-emerald-800" },
+      delivery: { label: "📝 ส่งมอบ/POD", bg: "bg-indigo-100 text-indigo-800" },
+      other: { label: "📷 รูปหลักฐาน", bg: "bg-slate-100 text-slate-800" }
+    };
+    const cat = catBadges[photo.category] || catBadges.other;
+
+    const elImg = document.getElementById("pv-img");
+    if (elImg) elImg.src = photo.url;
+
+    const elCoords = document.getElementById("pv-coords-text");
+    if (elCoords) elCoords.textContent = photo.coords || "13.7563° N, 100.5018° E";
+
+    const elTime = document.getElementById("pv-timestamp");
+    if (elTime) elTime.textContent = `${photo.timestamp || timelineEntry.time} น.`;
+
+    const elBadge = document.getElementById("pv-category-badge");
+    if (elBadge) {
+      elBadge.className = `px-2.5 py-1 rounded-full text-xs font-bold ${cat.bg}`;
+      elBadge.textContent = cat.label;
+    }
+
+    const elStep = document.getElementById("pv-step-name");
+    if (elStep) elStep.textContent = `ขั้นตอนที่ ${statusId}: ${timelineEntry.name}`;
+
+    const elTitle = document.getElementById("pv-title");
+    if (elTitle) elTitle.textContent = photo.title || timelineEntry.name;
+
+    const elJob = document.getElementById("pv-job-code");
+    if (elJob) elJob.textContent = `${job.id} (${job.code})`;
+
+    const elPlate = document.getElementById("pv-truck-plate");
+    if (elPlate) elPlate.textContent = v.plate;
+
+    const elDriver = document.getElementById("pv-driver-name");
+    if (elDriver) elDriver.textContent = d.name;
+
+    const elAuthor = document.getElementById("pv-author");
+    if (elAuthor) elAuthor.textContent = photo.author || timelineEntry.by || "คนขับรถ (Driver Mobile App)";
+
+    const elCaption = document.getElementById("pv-caption");
+    if (elCaption) elCaption.textContent = photo.caption || timelineEntry.note || "ไม่มีบันทึกเพิ่มเติม";
+
+    const elDownload = document.getElementById("pv-download-btn");
+    if (elDownload) {
+      elDownload.href = photo.url;
+      elDownload.download = `Evidence_${job.id}_Step${statusId}_${photo.category}.jpg`;
+    }
+
+    modal.classList.remove("hidden");
+  },
+
+  closePhotoViewer() {
+    const modal = document.getElementById("modal-photo-viewer");
+    if (modal) modal.classList.add("hidden");
+  },
+
+  openUploadPhotoModal(source = "admin", preselectedStatusId = null) {
+    const job = window.store.getJob(this.selectedJobId);
+    if (!job) return;
+
+    this.uploadSource = source;
+    this.pendingUploadPhotoUrl = null;
+    this.pendingUploadPhotoName = null;
+
+    const modal = document.getElementById("modal-upload-photo");
+    if (!modal) return;
+
+    const flow = window.store.getStatusFlow(job);
+    const selStep = document.getElementById("upload-photo-step");
+    if (selStep) {
+      const targetId = preselectedStatusId || job.currentStatusId;
+      selStep.innerHTML = flow.map(s => `
+        <option value="${s.id}" ${s.id === targetId ? "selected" : ""}>
+          ${s.id}. ${s.name} ${s.id === job.currentStatusId ? "(ขั้นตอนปัจจุบัน)" : ""}
+        </option>
+      `).join("");
+    }
+
+    // Clear file input & preview
+    const fileInput = document.getElementById("upload-photo-file");
+    if (fileInput) fileInput.value = "";
+    this.clearUploadPhotoPreview();
+
+    // Default category & caption based on preselected step
+    const targetStatusId = preselectedStatusId || job.currentStatusId;
+    const targetMeta = window.store.getStatusMeta(targetStatusId, job);
+    if (targetMeta?.key === "border_customs") {
+      this.setUploadCategory("customs");
+      this.selectMockPhotoPreset("customs");
+    } else if (targetStatusId === 1 || targetStatusId === 3) {
+      this.setUploadCategory("inspection");
+      this.selectMockPhotoPreset("inspection");
+    } else if (targetStatusId === 4) {
+      this.setUploadCategory("fuel");
+      this.selectMockPhotoPreset("fuel");
+    } else if (targetStatusId >= 6) {
+      this.setUploadCategory("delivery");
+      this.selectMockPhotoPreset("pod");
+    } else {
+      this.setUploadCategory("fuel");
+      this.selectMockPhotoPreset("fuel");
+    }
+
+    modal.classList.remove("hidden");
+  },
+
+  closeUploadPhotoModal() {
+    const modal = document.getElementById("modal-upload-photo");
+    if (modal) modal.classList.add("hidden");
+    this.clearUploadPhotoPreview();
+  },
+
+  setUploadCategory(catKey) {
+    const hiddenInput = document.getElementById("upload-photo-category");
+    if (hiddenInput) hiddenInput.value = catKey;
+
+    const buttons = document.querySelectorAll("#upload-category-buttons .cat-btn");
+    buttons.forEach(btn => {
+      if (btn.getAttribute("data-cat") === catKey) {
+        btn.className = "cat-btn py-2 px-2 rounded-xl border text-xs font-bold text-center border-blue-500 bg-blue-50 text-blue-700 shadow-sm";
+      } else {
+        btn.className = "cat-btn py-2 px-2 rounded-xl border text-xs font-bold text-center border-slate-200 bg-white text-slate-700 hover:bg-slate-50";
+      }
+    });
+  },
+
+  handlePhotoFileSelected(event) {
+    const file = event.target?.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      this.pendingUploadPhotoUrl = e.target.result;
+      this.pendingUploadPhotoName = file.name;
+      this.showUploadPreview(e.target.result, file.name);
+    };
+    reader.readAsDataURL(file);
+  },
+
+  selectMockPhotoPreset(presetKey) {
+    const job = window.store.getJob(this.selectedJobId);
+    const v = window.store.getVehicle(job?.vehicleId) || { plate: "ชบ.74-0549" };
+    const curTime = new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+
+    let presetCfg = null;
+    let captionText = "";
+    let catKey = "other";
+
+    if (presetKey === "fuel") {
+      catKey = "fuel";
+      captionText = "ภาพถ่ายใบเสร็จและมิเตอร์ตู้จ่ายน้ำมัน B7 จำนวน 32,000 ลิตร หัวจ่าย #04";
+      presetCfg = {
+        category: "fuel",
+        title: "มิเตอร์ตู้จ่ายน้ำมันดีเซล B7",
+        detail: "DIESEL B7 - 32,000 L / PUMP #04",
+        plate: v.plate,
+        coords: "13.1205° N, 100.9142° E",
+        time: `${curTime} น.`,
+        badge: "⛽ REFUEL METER"
+      };
+    } else if (presetKey === "customs") {
+      catKey = "customs";
+      captionText = "ภาพถ่ายจุดตรวจปล่อยด่านศุลกากรอรัญประเทศ พร้อมใบขนสินค้า กศก.120";
+      presetCfg = {
+        category: "customs",
+        title: "จุดตรวจปล่อยด่านศุลกากรอรัญประเทศ (ขาออก)",
+        detail: "กศก.120 / CB-PERMIT 2026",
+        plate: v.plate,
+        coords: "13.6624° N, 102.5082° E",
+        time: `${curTime} น.`,
+        badge: "🛂 CUSTOMS GATE"
+      };
+    } else if (presetKey === "seal") {
+      catKey = "seal";
+      captionText = "ภาพถ่ายตรวจสอบซีลนิรภัยล็อกวาล์วถังก๊าซ/ถังน้ำมัน สภาพสมบูรณ์ไม่มีรอยตัด";
+      presetCfg = {
+        category: "seal",
+        title: "ตรวจสภาพซีลล็อกนิรภัยถังบรรทุก (Tamper Seal)",
+        detail: `SEAL NO. TH-CUSTOMS-${Math.floor(1000 + Math.random() * 9000)}`,
+        plate: v.plate,
+        coords: "13.6620° N, 102.5075° E",
+        time: `${curTime} น.`,
+        badge: "🔒 TAMPER SEAL"
+      };
+    } else if (presetKey === "inspection") {
+      catKey = "inspection";
+      captionText = "ภาพถ่ายตรวจสภาพลมยาง ระบบเบรก และความพร้อมอุปกรณ์ความปลอดภัย DG";
+      presetCfg = {
+        category: "inspection",
+        title: "ตรวจสภาพความพร้อมรถและอุปกรณ์ความปลอดภัย",
+        detail: "TIRE / BRAKE / DG SAFETY PASS",
+        plate: v.plate,
+        coords: "13.1200° N, 100.9140° E",
+        time: `${curTime} น.`,
+        badge: "🔍 SAFETY PASS"
+      };
+    } else if (presetKey === "pod") {
+      catKey = "delivery";
+      captionText = "ภาพถ่ายใบส่งมอบสินค้า (POD) พร้อมลายเซ็นและประทับตราผู้รับสินค้าปลายทาง";
+      presetCfg = {
+        category: "delivery",
+        title: "ใบส่งมอบสินค้าสำเร็จ (POD) มีลายเซ็น",
+        detail: `POD SIGNED / METER DISCHARGE COMPLETED`,
+        plate: v.plate,
+        coords: "13.3611° N, 100.9847° E",
+        time: `${curTime} น.`,
+        badge: "📝 PROOF OF DELIVERY"
+      };
+    }
+
+    if (presetCfg && window.buildEvidenceSvg) {
+      const dataUri = window.buildEvidenceSvg(presetCfg);
+      this.pendingUploadPhotoUrl = dataUri;
+      this.pendingUploadPhotoName = `${presetKey}_evidence.svg`;
+      this.showUploadPreview(dataUri, `ภาพจำลอง: ${presetCfg.title}`);
+      this.setUploadCategory(catKey);
+
+      const elCaption = document.getElementById("upload-photo-caption");
+      if (elCaption) elCaption.value = captionText;
+    }
+  },
+
+  showUploadPreview(url, name) {
+    const box = document.getElementById("upload-preview-container");
+    const img = document.getElementById("upload-preview-img");
+    const label = document.getElementById("upload-preview-name");
+    if (box && img) {
+      img.src = url;
+      if (label) label.textContent = name || "เลือกรูปภาพแล้ว";
+      box.classList.remove("hidden");
+    }
+  },
+
+  clearUploadPhotoPreview() {
+    this.pendingUploadPhotoUrl = null;
+    this.pendingUploadPhotoName = null;
+    const box = document.getElementById("upload-preview-container");
+    if (box) box.classList.add("hidden");
+  },
+
+  submitUploadPhoto(event) {
+    if (event) event.preventDefault();
+
+    const job = window.store.getJob(this.selectedJobId);
+    if (!job) return;
+
+    if (!this.pendingUploadPhotoUrl) {
+      this.selectMockPhotoPreset("fuel");
+    }
+
+    const selStep = document.getElementById("upload-photo-step");
+    const targetStatusId = selStep ? parseInt(selStep.value) : job.currentStatusId;
+    const category = document.getElementById("upload-photo-category")?.value || "fuel";
+    const caption = document.getElementById("upload-photo-caption")?.value || "บันทึกภาพถ่ายหลักฐาน";
+
+    const catTitleMap = {
+      fuel: "ภาพถ่ายใบเสร็จ/มิเตอร์เติมน้ำมัน",
+      customs: "ภาพถ่ายด่านศุลกากร/ใบขนสินค้า กศก.120",
+      seal: "ภาพถ่ายซีลล็อกนิรภัยถังบรรทุก",
+      inspection: "ภาพถ่ายตรวจสภาพความพร้อมรถ",
+      delivery: "ภาพถ่ายใบรับสินค้า POD / มิเตอร์จ่าย",
+      other: "ภาพถ่ายหลักฐานการปฏิบัติงาน"
+    };
+
+    const curTime = new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+    const author = this.uploadSource === "driver" ? "คนขับรถ (Driver Mobile App)" : "ผู้ดูแลระบบ (Admin)";
+
+    const newPhoto = {
+      id: "P-" + Date.now().toString(36),
+      category: category,
+      title: catTitleMap[category] || "ภาพถ่ายหลักฐาน",
+      caption: caption,
+      url: this.pendingUploadPhotoUrl,
+      timestamp: `${curTime}`,
+      coords: job.lastGpsCoords || "13.7563° N, 100.5018° E",
+      author: author
+    };
+
+    window.store.addJobTimelinePhoto(this.selectedJobId, targetStatusId, newPhoto);
+    this.closeUploadPhotoModal();
+    this.showToast(`บันทึกและแนบรูปภาพหลักฐาน (${catTitleMap[category]}) สำเร็จ`, "success");
+
+    // Refresh UI
+    this.renderStatusTracking();
+    this.renderDriverMobileView();
+    if (job.vehicleId) {
+      const modalVd = document.getElementById("modal-vehicle-detail");
+      if (modalVd && !modalVd.classList.contains("hidden")) {
+        this.renderVehicleDetailModalData(job.vehicleId);
+      }
     }
   },
 
@@ -526,6 +941,172 @@ const App = {
 
   closeCustomsPermitModal() {
     const modal = document.getElementById("modal-customs-permit");
+    if (modal) modal.classList.add("hidden");
+  },
+
+  openTransportManifestModal(jobId) {
+    const job = window.store.getJob(jobId || this.selectedJobId);
+    if (!job) return;
+
+    const cust = window.store.getCustomer(job.customerId) || { name: "ลูกค้าผู้รับสินค้า", address: "-" };
+    const v = window.store.getVehicle(job.vehicleId) || { plate: "ชบ.74-0549", model: "P360", dltUnitId: "2020001000NEXTROUTE00740549" };
+    const d = window.store.getDriver(job.driverId) || { name: "นายสุเทพ โพธิ์ศรี", licenseNo: "ท.4-64000892", phone: "089-123-0007" };
+    const pLoc = window.store.getLocation(job.pickupLocId) || { name: "คลังน้ำมันและปิโตรเคมีมาบตาพุด", province: "ระยอง" };
+    const dLoc = window.store.getLocation(job.dropoffLocId) || { name: "โรงกลั่นน้ำมันศรีราชา (ไทยออยล์)", province: "ชลบุรี" };
+    const statusMeta = window.store.getStatusMeta(job.currentStatusId, job) || { name: "กำลังขนส่ง" };
+    const flow = window.store.getStatusFlow(job);
+
+    const isDiesel = (job.productType || "").includes("ดีเซล") || (job.productType || "").includes("น้ำมัน");
+    const unNumber = isDiesel ? "UN 1202" : "UN 1075";
+    const hazmatName = isDiesel ? "DIESEL FUEL / GAS OIL (ของเหลวไวไฟ คลาส 3)" : "PETROLEUM GASES, LIQUEFIED (ก๊าซไวไฟ คลาส 2.1)";
+    const hazardClass = isDiesel ? "CLASS 3 (ของเหลวไวไฟ)" : "CLASS 2.1 (ก๊าซไวไฟ)";
+    const sealNo = job.customsSealNo || "SEAL-NRL-" + (job.id ? job.id.replace(/\D/g, "") : "8821");
+
+    const container = document.getElementById("manifest-printable-content");
+    if (!container) return;
+
+    container.innerHTML = `
+      <!-- Header -->
+      <div class="flex items-start justify-between border-b-2 border-slate-900 pb-4">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 bg-blue-700 text-white rounded-xl flex items-center justify-center font-bold text-xl shadow">
+            NR
+          </div>
+          <div>
+            <div class="text-base font-black text-slate-900 tracking-tight">บริษัท เน็คท์รูท โลจิสติกส์ จำกัด (NextRoute Logistics Co., Ltd.)</div>
+            <div class="text-xs text-slate-600">99/12 หมู่ 3 ต.ดอนหัวฬ่อ อ.เมืองชลบุรี จ.ชลบุรี 20000 • โทร 038-123-456</div>
+            <div class="text-[11px] text-blue-700 font-semibold">ระบบบริหารงานขนส่งและติดตามวัตถุอันตรายมาตรฐานกรมการขนส่งทางบก (DLT GPS Certified)</div>
+          </div>
+        </div>
+        <div class="text-right">
+          <div class="text-[10px] font-bold uppercase text-slate-400">เลขที่เอกสาร / Manifest No.</div>
+          <div class="text-sm font-black font-mono text-slate-900">NRL-POD-${job.code || job.id}</div>
+          <div class="text-[10px] text-slate-500 mt-0.5">วันที่: ${job.departureDate || new Date().toISOString().split("T")[0]}</div>
+        </div>
+      </div>
+
+      <!-- Title Banner -->
+      <div class="bg-slate-900 text-white p-2.5 rounded-lg text-center">
+        <h2 class="text-sm font-black tracking-wide uppercase">ใบกำกับการขนส่งวัตถุอันตรายและใบส่งมอบสินค้า (Dangerous Goods Manifest & Proof of Delivery)</h2>
+        <div class="text-[10px] text-slate-300">ออกตามพระราชบัญญัติการขนส่งทางบก พ.ศ. 2522 และประกาศกรมการขนส่งทางบก</div>
+      </div>
+
+      <!-- Danger Class Hazard Box -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 p-3 bg-amber-50/80 border border-amber-300 rounded-xl text-xs">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 bg-rose-600 text-white rounded-lg flex flex-col items-center justify-center font-bold border-2 border-white shadow-sm shrink-0">
+            <span class="text-[10px] leading-none">🔥</span>
+            <span class="text-sm font-black leading-none mt-1">3</span>
+          </div>
+          <div>
+            <div class="text-[10px] font-bold text-slate-500 uppercase">การจำแนกประเภท (Hazard Class)</div>
+            <div class="font-black text-rose-700">${hazardClass}</div>
+            <div class="font-mono font-bold text-slate-800 text-xs">${unNumber}</div>
+          </div>
+        </div>
+        <div>
+          <div class="text-[10px] font-bold text-slate-500 uppercase">ชื่อผลิตภัณฑ์ / Proper Shipping Name</div>
+          <div class="font-bold text-slate-900">${job.productType}</div>
+          <div class="text-[11px] text-slate-600">${hazmatName}</div>
+        </div>
+        <div>
+          <div class="text-[10px] font-bold text-slate-500 uppercase">ปริมาณและหมายเลขซีลนิรภัย</div>
+          <div class="font-black text-blue-700 font-mono text-sm">${job.productQty}</div>
+          <div class="text-[11px] font-mono text-emerald-800 font-bold">🔒 Security Seal: ${sealNo}</div>
+        </div>
+      </div>
+
+      <!-- Parties: Shipper vs Consignee -->
+      <div class="grid grid-cols-2 gap-4 text-xs">
+        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+          <div class="text-[10px] font-bold uppercase text-slate-400">คลังต้นทางที่จ่ายสินค้า (Shipper / Terminal)</div>
+          <div class="font-bold text-slate-900">${pLoc.name}</div>
+          <div class="text-slate-600">จังหวัด: ${pLoc.province}</div>
+          <div class="text-slate-500 text-[11px]">เวลาออกเดินทาง: ${job.departureTime || "09:00"} น.</div>
+        </div>
+        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+          <div class="text-[10px] font-bold uppercase text-slate-400">ผู้รับสินค้า / จุดหมายปลายทาง (Consignee / Destination)</div>
+          <div class="font-bold text-slate-900">${cust.name}</div>
+          <div class="text-slate-600">จุดส่งมอบ: ${dLoc.name} (${dLoc.province})</div>
+          <div class="text-emerald-700 font-bold text-[11px]">เวลาคาดการณ์ถึง (ETA): ${job.eta || "-"} น.</div>
+        </div>
+      </div>
+
+      <!-- Carrier & Driver Details -->
+      <div class="grid grid-cols-3 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+        <div>
+          <span class="text-[10px] font-bold text-slate-400 block">ทะเบียนรถบรรทุก:</span>
+          <strong class="font-mono text-slate-900 text-sm">${v.plate}</strong>
+          <span class="text-[10px] text-slate-500 block">${v.brand || "Scania"} ${v.model || "P360"}</span>
+        </div>
+        <div>
+          <span class="text-[10px] font-bold text-slate-400 block">รหัสเครื่อง DLT GPS (NWT):</span>
+          <strong class="font-mono text-blue-700 text-[11px] block truncate">${v.dltUnitId || "2020001000NEXTROUTE00740549"}</strong>
+          <span class="text-[10px] text-emerald-600 font-bold">🟢 เชื่อมต่อระบบกรมการขนส่งทางบก</span>
+        </div>
+        <div>
+          <span class="text-[10px] font-bold text-slate-400 block">พนักงานขับรถ:</span>
+          <strong class="text-slate-900 text-xs block">${d.name}</strong>
+          <span class="text-[10px] text-slate-500 block">ใบขับขี่ ท.4: ${d.licenseNo || "ท.4-64000892"}</span>
+        </div>
+      </div>
+
+      <!-- Workflow Timeline Status -->
+      <div class="space-y-1.5 text-xs">
+        <div class="font-bold text-slate-800 flex items-center justify-between">
+          <span>ความคืบหน้าสถานะการจัดส่ง (Status Audit Trail):</span>
+          <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700">สถานะปัจจุบัน: ${statusMeta.name}</span>
+        </div>
+        <div class="grid grid-cols-4 sm:grid-cols-7 gap-1.5 text-center">
+          ${flow.map(s => {
+            const isDone = s.id <= job.currentStatusId;
+            return `
+              <div class="p-1.5 rounded-lg border text-[10px] ${isDone ? 'bg-emerald-50 border-emerald-300 text-emerald-800 font-bold' : 'bg-slate-50 border-slate-200 text-slate-400'}">
+                <div>${s.id}. ${s.name}</div>
+                <div class="text-[9px] mt-0.5">${isDone ? '✓ บันทึกแล้ว' : 'รอดำเนินการ'}</div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      </div>
+
+      <!-- Signatures / Acceptance -->
+      <div class="pt-4 border-t border-slate-200 grid grid-cols-3 gap-4 text-center text-xs">
+        <div class="p-3 border border-dashed border-slate-300 rounded-xl space-y-2">
+          <div class="text-[10px] font-bold text-slate-500">ผู้จ่ายสินค้า / คลังต้นทาง</div>
+          <div class="h-10 border-b border-slate-300"></div>
+          <div class="text-[10px] text-slate-400">(เจ้าหน้าที่คลังน้ำมัน)</div>
+          <div class="text-[9px] text-slate-400">วันที่: ...../...../..........</div>
+        </div>
+        <div class="p-3 border border-dashed border-slate-300 rounded-xl space-y-2">
+          <div class="text-[10px] font-bold text-slate-500">พนักงานขับรถ / ผู้ขนส่ง</div>
+          <div class="h-10 border-b border-slate-300 flex items-center justify-center font-serif text-slate-700 italic">
+            ${d.name}
+          </div>
+          <div class="text-[10px] text-slate-600 font-bold">${d.name}</div>
+          <div class="text-[9px] text-slate-400">เวลาออก: ${job.departureTime || "09:00"} น.</div>
+        </div>
+        <div class="p-3 border border-dashed border-slate-300 rounded-xl space-y-2">
+          <div class="text-[10px] font-bold text-slate-500">ผู้รับมอบสินค้า / ปลายทาง</div>
+          <div class="h-10 border-b border-slate-300"></div>
+          <div class="text-[10px] text-slate-400">(ลงนามและประทับตรา)</div>
+          <div class="text-[9px] text-slate-400">วันที่: ...../...../.......... เวลา: .....:..... น.</div>
+        </div>
+      </div>
+
+      <!-- Official Footer Stamp -->
+      <div class="pt-2 text-[10px] text-slate-400 flex items-center justify-between border-t border-slate-100">
+        <div>NextRoute TMS Security & Compliance System • Tamper-proof GPS Verification</div>
+        <div class="font-mono">VERIFIED BY NWT CLOUD GPS • CERTIFIED ACCURATE</div>
+      </div>
+    `;
+
+    const modal = document.getElementById("modal-transport-manifest");
+    if (modal) modal.classList.remove("hidden");
+  },
+
+  closeTransportManifestModal() {
+    const modal = document.getElementById("modal-transport-manifest");
     if (modal) modal.classList.add("hidden");
   },
 
@@ -816,8 +1397,11 @@ const App = {
     // Populate dropdowns
     const custs = window.store.getCustomers();
     const locs = window.store.getLocations();
-    const vehicles = window.store.getVehicles().filter(v => v.status === "ready" || v.status === "idle");
-    const drivers = window.store.getDrivers().filter(d => d.status === "ready");
+    const activeJobs = window.store.getJobs().filter(j => !window.store.isJobCompleted(j));
+    const activeVehicleIds = new Set(activeJobs.map(j => j.vehicleId));
+    const activeDriverIds = new Set(activeJobs.map(j => j.driverId));
+    const vehicles = window.store.getVehicles().filter(v => v.status !== "maintenance" && v.status !== "offline" && !activeVehicleIds.has(v.id));
+    const drivers = window.store.getDrivers().filter(d => d.status !== "leave" && !activeDriverIds.has(d.id));
 
     const selCust = document.getElementById("wiz-customer");
     if (selCust) {
@@ -1791,6 +2375,13 @@ const App = {
               <div>
                 <div class="font-bold ${isCurrent ? (step.key === 'border_customs' ? 'text-purple-800' : 'text-blue-800') : 'text-slate-800'}">${step.name}</div>
                 <div class="text-[10px] text-slate-500 leading-tight">${log ? log.note : step.desc}</div>
+                ${log && log.photos && log.photos.length > 0 ? `
+                  <div class="mt-1 flex items-center gap-1">
+                    <button type="button" onclick="App.openPhotoViewer('${job.id}', ${step.id}, 0)" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-100 hover:bg-blue-200 text-blue-800 text-[10px] font-bold transition">
+                      📷 รูปหลักฐาน (${log.photos.length} รูป)
+                    </button>
+                  </div>
+                ` : ''}
               </div>
             </div>
             <span class="font-mono text-[10px] text-slate-500 shrink-0">${log ? log.time + ' น.' : '-'}</span>
@@ -2072,23 +2663,48 @@ const App = {
         const isDone = step.id < activeJob.currentStatusId;
         const isCurrent = step.id === activeJob.currentStatusId;
         const isFuture = step.id > activeJob.currentStatusId;
+        const log = (activeJob.timeline || []).find(t => t.statusId === step.id);
+        const photos = log?.photos || [];
 
         return `
-          <div class="flex items-center justify-between p-3 rounded-xl border ${isCurrent ? (step.key === 'border_customs' ? 'bg-purple-50 border-purple-300 ring-2 ring-purple-100' : 'bg-blue-50 border-blue-300 ring-2 ring-blue-100') : isDone ? 'bg-slate-50 border-slate-200 opacity-75' : 'bg-white border-slate-100'}">
-            <div class="flex items-center gap-3">
-              <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${isDone ? 'bg-emerald-500 text-white' : isCurrent ? (step.key === 'border_customs' ? 'bg-purple-600 text-white shadow' : 'bg-blue-600 text-white shadow') : 'bg-slate-200 text-slate-500'}">
-                ${isDone ? `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>` : step.id}
+          <div class="flex flex-col p-3 rounded-xl border ${isCurrent ? (step.key === 'border_customs' ? 'bg-purple-50 border-purple-300 ring-2 ring-purple-100' : 'bg-blue-50 border-blue-300 ring-2 ring-blue-100') : isDone ? 'bg-slate-50 border-slate-200 opacity-85' : 'bg-white border-slate-100'}">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${isDone ? 'bg-emerald-500 text-white' : isCurrent ? (step.key === 'border_customs' ? 'bg-purple-600 text-white shadow' : 'bg-blue-600 text-white shadow') : 'bg-slate-200 text-slate-500'}">
+                  ${isDone ? `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>` : step.id}
+                </div>
+                <div>
+                  <div class="text-xs font-bold ${isCurrent ? (step.key === 'border_customs' ? 'text-purple-800' : 'text-blue-800') : 'text-slate-700'}">${step.name}</div>
+                  <div class="text-[10px] text-slate-400">${step.desc}</div>
+                </div>
               </div>
-              <div>
-                <div class="text-xs font-bold ${isCurrent ? (step.key === 'border_customs' ? 'text-purple-800' : 'text-blue-800') : 'text-slate-700'}">${step.name}</div>
-                <div class="text-[10px] text-slate-400">${step.desc}</div>
-              </div>
+              ${isCurrent ? `
+                <div class="flex items-center gap-1.5">
+                  <button type="button" onclick="App.openUploadPhotoModal('driver', ${step.id})" title="ถ่ายรูปแนบหลักฐาน" class="p-1.5 bg-white border border-slate-200 hover:border-blue-400 text-slate-600 rounded-lg text-xs shadow-sm">
+                    📷
+                  </button>
+                  <button onclick="App.advanceDriverStatus('${activeJob.id}')" class="px-3 py-1.5 ${step.key === 'border_customs' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'} text-white text-xs font-bold rounded-lg shadow-sm transition">
+                    อัปเดตขั้นตอนนี้
+                  </button>
+                </div>
+              ` : isDone ? `
+                <div class="flex items-center gap-2">
+                  <button type="button" onclick="App.openUploadPhotoModal('driver', ${step.id})" title="ถ่ายรูปแนบหลักฐานเพิ่มเติม" class="text-[11px] text-slate-400 hover:text-blue-600">
+                    📷+
+                  </button>
+                  <span class="text-emerald-600 text-[11px] font-bold">สำเร็จ</span>
+                </div>
+              ` : `<span class="text-slate-300 text-[11px]">รอขั้นตอน</span>`}
             </div>
-            ${isCurrent ? `
-              <button onclick="App.advanceDriverStatus('${activeJob.id}')" class="px-3 py-1.5 ${step.key === 'border_customs' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'} text-white text-xs font-bold rounded-lg shadow-sm transition">
-                อัปเดตขั้นตอนนี้
-              </button>
-            ` : isDone ? `<span class="text-emerald-600 text-[11px] font-bold">สำเร็จ</span>` : `<span class="text-slate-300 text-[11px]">รอขั้นตอน</span>`}
+
+            ${photos.length > 0 ? `
+              <div class="mt-2 pt-1.5 border-t border-slate-200/60 flex items-center justify-between text-[11px]">
+                <button type="button" onclick="App.openPhotoViewer('${activeJob.id}', ${step.id}, 0)" class="text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1">
+                  📷 ภาพหลักฐาน (${photos.length} รูป) &rarr;
+                </button>
+                <span class="text-[10px] text-slate-400 font-mono">${log ? log.time + ' น.' : ''}</span>
+              </div>
+            ` : ''}
           </div>
         `;
       }).join("");

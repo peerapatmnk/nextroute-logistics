@@ -19,11 +19,40 @@ class AppStore {
           parsed.crossBorderStatusFlow = window.DEFAULT_DATA?.crossBorderStatusFlow;
           parsed.domesticStatusFlow = window.DEFAULT_DATA?.domesticStatusFlow;
         }
+
+        // Auto-Sync and Upgrade to 100% Real NWT Fleet & Real Drivers (Version 3)
+        if (parsed.nwtSyncVersion !== 3 && window.DEFAULT_DATA?.vehicles) {
+          parsed.vehicles = JSON.parse(JSON.stringify(window.DEFAULT_DATA.vehicles));
+          parsed.drivers = JSON.parse(JSON.stringify(window.DEFAULT_DATA.drivers));
+          parsed.locations = JSON.parse(JSON.stringify(window.DEFAULT_DATA.locations));
+          parsed.company = JSON.parse(JSON.stringify(window.DEFAULT_DATA.company));
+          parsed.jobs = JSON.parse(JSON.stringify(window.DEFAULT_DATA.jobs));
+          parsed.nwtSyncVersion = 3;
+          parsed.isRealNwtFleet = true;
+          localStorage.setItem(this.STORAGE_KEY, JSON.stringify(parsed));
+        }
         // Ensure JN-005 has isCrossBorder
         const defaultJN005 = window.DEFAULT_DATA?.jobs?.find(j => j.id === "JN-005");
         const storedJN005 = parsed.jobs?.find(j => j.id === "JN-005");
         if (storedJN005 && defaultJN005 && !storedJN005.isCrossBorder) {
           Object.assign(storedJN005, defaultJN005);
+        }
+
+        // Backfill sample photos into timeline for seed jobs if not already present
+        if (window.DEFAULT_DATA?.jobs && parsed.jobs) {
+          window.DEFAULT_DATA.jobs.forEach(defJob => {
+            const storedJob = parsed.jobs.find(j => j.id === defJob.id);
+            if (storedJob && storedJob.timeline && defJob.timeline) {
+              defJob.timeline.forEach(defStep => {
+                if (defStep.photos && defStep.photos.length > 0) {
+                  const storedStep = storedJob.timeline.find(s => s.statusId === defStep.statusId);
+                  if (storedStep && (!storedStep.photos || storedStep.photos.length === 0)) {
+                    storedStep.photos = JSON.parse(JSON.stringify(defStep.photos));
+                  }
+                }
+              });
+            }
+          });
         }
         return parsed;
       }
@@ -71,6 +100,52 @@ class AppStore {
   getLocations() { return this.state.locations || []; }
   getCustomers() { return this.state.customers || []; }
   getJobs() { return this.state.jobs || []; }
+
+  /**
+   * Sync Live NWT Telemetry into Store (GPS Coordinates, Speed, Fuel, Status)
+   */
+  syncNwtLive(liveData) {
+    if (!liveData) return false;
+    const vList = Array.isArray(liveData.vehicles) ? liveData.vehicles : (liveData.vehicles?.value || []);
+    if (!vList || vList.length === 0) return false;
+    let changed = false;
+    vList.forEach(lv => {
+      const v = this.state.vehicles?.find(item => item.id === lv.id || item.rawPlate === lv.rawPlate || item.plate === lv.plate || item.imei === lv.imei);
+      if (v) {
+        if (typeof lv.lat === "number" && typeof lv.lng === "number") {
+          v.lat = lv.lat;
+          v.lng = lv.lng;
+        }
+        if (lv.brand) v.brand = lv.brand;
+        if (lv.model) v.model = lv.model;
+        if (lv.driverName) v.driverName = lv.driverName;
+        if (lv.driverNameEn) v.driverNameEn = lv.driverNameEn;
+        if (lv.dltUnitId) v.dltUnitId = lv.dltUnitId;
+        if (lv.fuelTankSize) v.fuelTankSize = lv.fuelTankSize;
+        if (typeof lv.speed === "number") v.speed = lv.speed;
+        if (typeof lv.fuelLevel === "number") v.fuelLevel = lv.fuelLevel;
+        if (typeof lv.odometerKm === "number") v.odometerKm = lv.odometerKm;
+        if (lv.status) v.status = lv.status;
+        if (lv.address) v.address = lv.address;
+        v.lastUpdate = lv.lastUpdate || "สดจากดาวเทียม NWT";
+        changed = true;
+      }
+    });
+    if (changed) {
+      this.state.lastGpsSync = new Date().toISOString();
+      this.state.nwtSyncSummary = {
+        totalVehicles: liveData.totalVehicles || liveData.vehicles.length,
+        runningCount: liveData.runningCount || this.state.vehicles.filter(v => v.status === "running").length,
+        syncTime: liveData.syncTime || new Date().toLocaleTimeString("th-TH")
+      };
+      this.saveState();
+      this.notify();
+      try {
+        window.dispatchEvent(new CustomEvent("nwt:gps-synced", { detail: liveData }));
+      } catch (e) {}
+    }
+    return changed;
+  }
 
   getStatusFlow(jobOrIsCrossBorder = false) {
     const isCross = (typeof jobOrIsCrossBorder === "boolean")
@@ -153,7 +228,7 @@ class AppStore {
   }
 
   // Job Operations
-  updateJobStatus(jobId, newStatusId, note = "", actor = "ระบบ") {
+  updateJobStatus(jobId, newStatusId, note = "", actor = "ระบบ", photos = []) {
     const job = this.getJob(jobId);
     if (!job) return false;
 
@@ -167,12 +242,14 @@ class AppStore {
     job.currentStatusKey = statusObj.key;
 
     if (!job.timeline) job.timeline = [];
+    const photoArr = Array.isArray(photos) ? photos : (photos ? [photos] : []);
     job.timeline.push({
       statusId: newStatusId,
       name: statusObj.name,
       time: timeStr,
       note: note || `เปลี่ยนสถานะเป็น ${statusObj.name}`,
-      by: actor
+      by: actor,
+      photos: photoArr
     });
 
     // Update vehicle status accordingly
@@ -195,6 +272,69 @@ class AppStore {
       }
     }
 
+    this.saveState();
+    return true;
+  }
+
+  revertJobStatus(jobId, reason = "คนขับกดย้อนกลับขั้นตอนเนื่องจากกดผิด", actor = "คนขับรถ (Driver)") {
+    const job = this.getJob(jobId);
+    if (!job) return false;
+
+    if (job.currentStatusId <= 1) return false;
+
+    const prevStatusId = job.currentStatusId - 1;
+    const prevStatusObj = this.getStatusMeta(prevStatusId, job);
+    if (!prevStatusObj) return false;
+
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+
+    job.currentStatusId = prevStatusId;
+    job.currentStatusKey = prevStatusObj.key;
+
+    if (!job.timeline) job.timeline = [];
+    job.timeline.push({
+      statusId: prevStatusId,
+      name: `↺ ย้อนกลับสู่: ${prevStatusObj.name}`,
+      time: timeStr,
+      note: reason || `คนขับขอย้อนกลับสู่ขั้นตอน "${prevStatusObj.name}" เพื่อแก้ไขข้อมูล`,
+      by: actor,
+      photos: [],
+      isReverted: true
+    });
+
+    if (job.vehicleId) {
+      const v = this.getVehicle(job.vehicleId);
+      if (v) {
+        if (prevStatusObj.key === "in_transit") {
+          v.status = "running";
+          v.speed = Math.floor(Math.random() * 20) + 65;
+        } else if (prevStatusObj.key === "border_customs" || prevStatusObj.key === "loaded" || prevStatusObj.key === "inspected") {
+          v.status = "resting";
+          v.speed = 0;
+        } else if (prevStatusObj.key === "pending" || prevStatusObj.key === "assigned") {
+          v.status = "ready";
+          v.speed = 0;
+        }
+      }
+    }
+
+    this.saveState();
+    return true;
+  }
+
+  addJobTimelinePhoto(jobId, statusId, photoObj) {
+    const job = this.getJob(jobId);
+    if (!job || !job.timeline) return false;
+
+    let targetEntry = job.timeline.find(t => t.statusId === Number(statusId));
+    if (!targetEntry) {
+      targetEntry = job.timeline[job.timeline.length - 1];
+    }
+    if (!targetEntry) return false;
+
+    if (!targetEntry.photos) targetEntry.photos = [];
+    targetEntry.photos.push(photoObj);
     this.saveState();
     return true;
   }

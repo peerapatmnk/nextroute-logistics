@@ -4,161 +4,652 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>NextRoute Driver - ระบบพนักงานขับรถ</title>
+  <link rel="stylesheet" href="css/tailwind-offline.css">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="js/leaflet-fallback.js"></script>
   <link rel="stylesheet" href="css/styles.css">
+  <script src="js/auth.js"></script>
 </head>
-<body class="bg-slate-100 text-slate-800 antialiased min-h-screen flex justify-center pb-20">
+<body class="bg-slate-100 text-slate-800 antialiased min-h-screen flex justify-center pb-24">
+  <script>
+    // Auth Guard: Require logged in driver or admin
+    const curAuthUser = Auth.requireAuth();
+  </script>
 
-  <div class="w-full max-w-md bg-white min-h-screen flex flex-col shadow-xl">
+  <div class="w-full max-w-md bg-white min-h-screen flex flex-col shadow-xl relative">
     <!-- Driver App Header -->
-    <header class="bg-blue-600 text-white p-4 sticky top-0 z-30 shadow-md">
+    <header class="bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-3.5 sticky top-0 z-30 shadow-md">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2.5">
-          <div class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center font-bold text-sm">
+          <div class="w-9 h-9 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center font-bold text-base shadow-inner">
             🚚
           </div>
           <div>
-            <div class="text-[10px] text-blue-200 uppercase font-bold tracking-wider">NextRoute Logistics</div>
-            <div class="font-bold text-sm">ระบบพนักงานขับรถ (Driver)</div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-[9px] text-blue-200 uppercase font-bold tracking-wider">NextRoute Driver</span>
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            </div>
+            <div class="font-bold text-xs" id="driver-logged-name">พนักงานขับรถ</div>
           </div>
         </div>
         <div class="flex items-center gap-2">
-          <select id="driver-selector" class="bg-blue-700 text-white text-xs font-bold px-2 py-1 rounded-lg border border-blue-500 focus:outline-none"></select>
+          <span class="px-2 py-0.5 rounded-lg bg-white/15 text-[10px] font-mono font-bold text-white border border-white/20" id="driver-logged-plate">-</span>
+          <button onclick="Auth.logout()" title="ออกจากระบบ (Sign Out)" class="p-1.5 bg-white/10 hover:bg-rose-600 rounded-lg text-white transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+          </button>
         </div>
       </div>
     </header>
 
-    <!-- Main Content -->
+    <!-- Main Content Container -->
     <main class="flex-1 p-4 space-y-4">
-      <!-- Active Job Banner -->
-      <div class="p-4 bg-gradient-to-br from-slate-900 to-blue-950 text-white rounded-2xl shadow-lg relative overflow-hidden">
-        <div class="absolute -right-4 -bottom-4 w-28 h-28 bg-blue-500/10 rounded-full blur-xl"></div>
-        <div class="flex justify-between items-start mb-2">
-          <div>
+
+      <!-- ==============================================================
+           TAB VIEW 1: ACTIVE TASK (งานปัจจุบัน)
+      ============================================================== -->
+      <div id="view-task" class="space-y-4">
+
+        <!-- Active Emergency SOS Alert Banner (If active) -->
+        <div id="driver-sos-active-banner" class="hidden p-3.5 bg-rose-600 text-white rounded-2xl shadow-lg flex items-center justify-between gap-3 animate-pulse">
+          <div class="flex items-center gap-2.5 text-xs">
+            <span class="text-xl">🚨</span>
+            <div>
+              <div class="font-bold text-white">คุณได้ส่งสัญญาณแจ้งเหตุฉุกเฉิน</div>
+              <div class="text-[11px] text-rose-100" id="driver-sos-status-desc">ศูนย์ควบคุมรับทราบพิกัดและกำลังติดต่อกลับ</div>
+            </div>
+          </div>
+          <button type="button" onclick="DriverApp.clearEmergencyAlert()" class="px-2.5 py-1 bg-white text-rose-700 hover:bg-rose-50 rounded-lg text-[10px] font-bold shrink-0 transition">
+            ยกเลิก/ปลอดภัยแล้ว
+          </button>
+        </div>
+
+        <!-- Active Job Banner -->
+        <div class="p-4 bg-gradient-to-br from-slate-900 to-blue-950 text-white rounded-2xl shadow-lg relative overflow-hidden">
+          <div class="absolute -right-4 -bottom-4 w-28 h-28 bg-blue-500/10 rounded-full blur-xl"></div>
+          <div class="flex justify-between items-start mb-2">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] uppercase font-bold text-blue-400">งานประจำรอบปัจจุบัน</span>
+                <span id="driver-transport-type-tag" class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-500/30 text-blue-200">ในประเทศ (7 ขั้นตอน)</span>
+              </div>
+              <div id="driver-job-code" class="text-xl font-black font-mono mt-0.5">JN-2026-001</div>
+            </div>
+            <span id="driver-status-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-blue-600 text-white shadow">
+              ออกเดินทาง
+            </span>
+          </div>
+
+          <div class="space-y-1.5 text-xs text-slate-300 mt-3 pt-3 border-t border-slate-800">
+            <div class="flex justify-between"><span>ทะเบียนรถ:</span> <strong id="driver-vehicle-plate" class="text-white font-mono">-</strong></div>
+            <div class="flex justify-between"><span>สินค้าที่บรรทุก:</span> <strong id="driver-product-info" class="text-cyan-300 font-medium">-</strong></div>
+            <div class="flex justify-between"><span>เวลาถึงโดยประมาณ (ETA):</span> <strong id="driver-eta-info" class="text-emerald-400 font-mono font-bold">-</strong></div>
+          </div>
+        </div>
+
+        <!-- Cross-Border Clearance Card (เฉพาะงานข้ามแดน) -->
+        <div id="driver-cb-card" class="p-4 bg-gradient-to-r from-purple-950 to-indigo-950 text-white rounded-2xl border border-purple-500/40 shadow-sm hidden space-y-2.5 text-xs">
+          <div class="flex items-center justify-between pb-2 border-b border-purple-800">
             <div class="flex items-center gap-2">
-              <span class="text-[10px] uppercase font-bold text-blue-400">งานประจำรอบปัจจุบัน</span>
-              <span id="driver-transport-type-tag" class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-500/30 text-blue-200">ในประเทศ (7 ขั้นตอน)</span>
+              <span class="text-base">🌐</span>
+              <span class="font-bold text-white">เอกสารขออนุญาตข้ามแดน & ด่านศุลกากร</span>
             </div>
-            <div id="driver-job-code" class="text-xl font-black font-mono mt-0.5">JN-2026-001</div>
+            <span class="text-[10px] bg-purple-500/40 text-purple-200 px-2 py-0.5 rounded-full font-bold">ขั้นตอนพิเศษ</span>
           </div>
-          <span id="driver-status-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-blue-600 text-white shadow">
-            ออกเดินทาง
-          </span>
-        </div>
-
-        <div class="space-y-1.5 text-xs text-slate-300 mt-3 pt-3 border-t border-slate-800">
-          <div class="flex justify-between"><span>ทะเบียนรถประจำ:</span> <strong id="driver-vehicle-plate" class="text-white font-mono">-</strong></div>
-          <div class="flex justify-between"><span>สินค้าที่บรรทุก:</span> <strong id="driver-product-info" class="text-cyan-300 font-medium">-</strong></div>
-          <div class="flex justify-between"><span>เวลาถึงโดยประมาณ (ETA):</span> <strong id="driver-eta-info" class="text-emerald-400 font-mono font-bold">-</strong></div>
-        </div>
-      </div>
-
-      <!-- Cross-Border Clearance Card (เฉพาะงานข้ามแดน) -->
-      <div id="driver-cb-card" class="p-4 bg-gradient-to-r from-purple-950 to-indigo-950 text-white rounded-2xl border border-purple-500/40 shadow-sm hidden space-y-2.5 text-xs">
-        <div class="flex items-center justify-between pb-2 border-b border-purple-800">
-          <div class="flex items-center gap-2">
-            <span class="text-base">🌐</span>
-            <span class="font-bold text-white">เอกสารขออนุญาตข้ามแดน & ด่านศุลกากร</span>
+          <div class="space-y-1 text-purple-200 text-[11px]">
+            <div class="flex justify-between"><span>ใบขออนุญาตข้ามแดน:</span> <strong id="driver-cb-permit" class="text-white font-mono">-</strong></div>
+            <div class="flex justify-between"><span>ใบขนสินค้า กศก.120:</span> <strong id="driver-cb-declaration" class="text-emerald-400 font-mono">-</strong></div>
+            <div class="flex justify-between"><span>ด่านศุลกากรตรวจปล่อย:</span> <strong id="driver-cb-checkpoint" class="text-white">ด่านศุลกากรอรัญประเทศ</strong></div>
+            <div class="flex justify-between"><span>ซีลศุลกากร (Tamper Seal):</span> <strong id="driver-cb-seal" class="text-amber-300 font-mono">-</strong></div>
           </div>
-          <span class="text-[10px] bg-purple-500/40 text-purple-200 px-2 py-0.5 rounded-full font-bold">ขั้นตอนพิเศษ</span>
-        </div>
-        <div class="space-y-1 text-purple-200 text-[11px]">
-          <div class="flex justify-between"><span>ใบขออนุญาตข้ามแดน:</span> <strong id="driver-cb-permit" class="text-white font-mono">-</strong></div>
-          <div class="flex justify-between"><span>ใบขนสินค้า กศก.120:</span> <strong id="driver-cb-declaration" class="text-emerald-400 font-mono">-</strong></div>
-          <div class="flex justify-between"><span>ด่านศุลกากรตรวจปล่อย:</span> <strong id="driver-cb-checkpoint" class="text-white">ด่านศุลกากรอรัญประเทศ</strong></div>
-          <div class="flex justify-between"><span>ซีลศุลกากร (Tamper Seal):</span> <strong id="driver-cb-seal" class="text-amber-300 font-mono">-</strong></div>
-        </div>
-        <div class="p-2 bg-purple-900/40 rounded-xl text-[10px] text-purple-300">
-          ⚠️ คนขับต้องเตรียมพาสปอร์ตและแสดงเอกสารชุดนี้ต่อเจ้าหน้าที่ศุลกากรประจำด่านเพื่อตรวจปล่อยสินค้า
-        </div>
-      </div>
-
-      <!-- Quick Action: Advance Status -->
-      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-        <div class="flex items-center justify-between">
-          <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wide">ขั้นตอนที่ต้องดำเนินการถัดไป</h3>
-          <span class="text-[11px] text-blue-600 font-medium">กดปุ่มเพื่ออัปเดต</span>
+          <div class="p-2 bg-purple-900/40 rounded-xl text-[10px] text-purple-300">
+            ⚠️ คนขับต้องเตรียมพาสปอร์ตและแสดงเอกสารชุดนี้ต่อเจ้าหน้าที่ศุลกากรประจำด่านเพื่อตรวจปล่อยสินค้า
+          </div>
         </div>
 
-        <button id="btn-driver-advance" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 transition">
-          <span>อัปเดตสถานะงาน</span>
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
-        </button>
-
-        <div class="text-[11px] text-slate-400 text-center">
-          ระบบจะส่งพิกัด GPS อัตโนมัติไปยังผู้ดูแลระบบและลูกค้าทันที
-        </div>
-      </div>
-
-      <!-- Route Milestones & Locations -->
-      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-        <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wide">จุดหมายในเส้นทางนี้</h3>
-        
-        <div class="space-y-3 text-xs">
-          <div class="flex items-start gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-            <span class="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">1</span>
+        <!-- Upgraded Status Workflow, Revert & Advance Action Center (Feature 3 Safe Flow) -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3.5">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-100">
             <div>
-              <div class="text-[10px] font-bold text-emerald-700 uppercase">จุดรับสินค้า (โหลดผลิตภัณฑ์)</div>
-              <div id="driver-pickup-name" class="font-bold text-slate-800 mt-0.5">-</div>
-              <div id="driver-pickup-contact" class="text-[11px] text-slate-500 mt-0.5">ติดต่อ: -</div>
+              <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                <span>📋 ลำดับขั้นตอนการทำงาน (Workflow)</span>
+              </h3>
+              <p class="text-[10px] text-slate-400">ตรวจสอบขั้นตอนปัจจุบันและประวัติย้อนหลัง</p>
             </div>
+            <span id="driver-flow-progress" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700">
+              ขั้นตอนที่ -/-
+            </span>
           </div>
 
-          <div class="flex items-start gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-            <span class="w-6 h-6 rounded-full bg-rose-500 text-white flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">2</span>
+          <!-- Full Workflow Stepper List -->
+          <div id="driver-full-steps-list" class="space-y-2 text-xs">
+            <!-- Dynamically populated by renderDriverData() -->
+          </div>
+
+          <!-- Double Confirmation / Action Panel -->
+          <div class="pt-3 border-t border-slate-100 space-y-2.5">
+            <div class="flex items-center justify-between text-[11px]">
+              <span class="font-bold text-slate-700">คำสั่งควบคุมขั้นตอน:</span>
+              <span class="text-[10px] text-slate-400">กดเพื่ออัปเดตหรือย้อนกลับ</span>
+            </div>
+
+            <!-- Primary Advance Button -->
+            <button id="btn-driver-advance" onclick="DriverApp.openSmartAdvanceModal()" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 transition">
+              <span>ยืนยันและอัปเดตขั้นตอนนี้</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+            </button>
+
+            <!-- Safety Revert / Undo Button (For Accidental Clicks) -->
+            <button id="btn-driver-revert" type="button" onclick="DriverApp.openRevertModal()" class="w-full py-2.5 px-3 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-98 shadow-sm">
+              <svg class="w-3.5 h-3.5 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+              <span id="btn-driver-revert-text">↺ กดย้อนกลับไปขั้นตอนก่อนหน้า (กรณีเผลอกดผิด)</span>
+            </button>
+
+            <!-- Quick Action Row: Photo Report & Magic Tracking Link -->
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <button type="button" onclick="DriverApp.openUploadModal()" class="py-2.5 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-bold border border-blue-200 flex items-center justify-center gap-1.5 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                <span>📷 ถ่ายรูปรายงาน</span>
+              </button>
+
+              <button type="button" onclick="DriverApp.copyTrackingLink()" class="py-2.5 px-3 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl text-xs font-bold border border-amber-200 flex items-center justify-center gap-1.5 transition" title="คัดลอกลิงก์ให้ลูกค้า">
+                <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+                <span>🔗 ลิงก์สำหรับลูกค้า</span>
+              </button>
+            </div>
+
+            <div class="text-[10px] text-slate-400 text-center flex items-center justify-center gap-1 pt-1">
+              <svg class="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+              <span>ระบบบันทึกประวัติการย้อนกลับ (Audit Log) เพื่อความโปร่งใส</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Route Milestones & Locations with Google Maps & Direct Call (Feature 2) -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wide">จุดหมายในเส้นทางนี้ (Route Milestones)</h3>
+            <span class="text-[10px] text-blue-600 font-medium">กดปุ่มนำทาง / โทรได้ทันที</span>
+          </div>
+
+          <div class="space-y-3 text-xs">
+            <!-- Pickup Card -->
+            <div class="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+              <div class="flex items-start gap-2.5">
+                <span class="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">1</span>
+                <div class="flex-1 min-w-0">
+                  <div class="text-[10px] font-bold text-emerald-700 uppercase">จุดรับสินค้า (โหลดผลิตภัณฑ์)</div>
+                  <div id="driver-pickup-name" class="font-bold text-slate-800 text-xs mt-0.5 truncate">-</div>
+                  <div id="driver-pickup-contact" class="text-[11px] text-slate-500 mt-0.5">ติดต่อ: -</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 pt-1 border-t border-slate-200/60">
+                <a id="btn-pickup-nav" href="#" target="_blank" class="flex-1 py-1.5 px-2 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold rounded-lg flex items-center justify-center gap-1.5 shadow-sm transition">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+                  <span>🗺️ นำทาง Google Maps</span>
+                </a>
+                <a id="btn-pickup-call" href="#" class="py-1.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[11px] font-bold rounded-lg flex items-center justify-center gap-1 transition">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                  <span>โทร</span>
+                </a>
+              </div>
+            </div>
+
+            <!-- Dropoff Card -->
+            <div class="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+              <div class="flex items-start gap-2.5">
+                <span class="w-6 h-6 rounded-full bg-rose-500 text-white flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">2</span>
+                <div class="flex-1 min-w-0">
+                  <div class="text-[10px] font-bold text-rose-700 uppercase">จุดส่งสินค้า (ปลายทาง)</div>
+                  <div id="driver-dropoff-name" class="font-bold text-slate-800 text-xs mt-0.5 truncate">-</div>
+                  <div id="driver-dropoff-contact" class="text-[11px] text-slate-500 mt-0.5">ติดต่อ: -</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 pt-1 border-t border-slate-200/60">
+                <a id="btn-dropoff-nav" href="#" target="_blank" class="flex-1 py-1.5 px-2 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold rounded-lg flex items-center justify-center gap-1.5 shadow-sm transition">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+                  <span>🗺️ นำทาง Google Maps</span>
+                </a>
+                <a id="btn-dropoff-call" href="#" class="py-1.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[11px] font-bold rounded-lg flex items-center justify-center gap-1 transition">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                  <span>โทร</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Evidence Photos Gallery for this Trip -->
+        <div id="driver-photos-card" class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+              <span>📷 ภาพถ่ายหลักฐานในรอบงานนี้</span>
+              <span id="driver-photos-count" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700">0</span>
+            </h3>
+            <button type="button" onclick="DriverApp.openUploadModal()" class="text-[11px] font-bold text-blue-600 hover:text-blue-800">
+              + ถ่ายรูปเพิ่ม
+            </button>
+          </div>
+          <div id="driver-photos-gallery" class="grid grid-cols-2 gap-2">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+        <!-- Emergency SOS Incident Card (Feature 4) -->
+        <div class="p-4 bg-gradient-to-r from-rose-50 to-orange-50 rounded-2xl border border-rose-200 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center font-bold text-lg shadow-sm">
+              🚨
+            </div>
             <div>
-              <div class="text-[10px] font-bold text-rose-700 uppercase">จุดส่งสินค้า (ปลายทาง)</div>
-              <div id="driver-dropoff-name" class="font-bold text-slate-800 mt-0.5">-</div>
-              <div id="driver-dropoff-contact" class="text-[11px] text-slate-500 mt-0.5">ติดต่อ: -</div>
+              <div class="text-xs font-bold text-slate-900">แจ้งเหตุฉุกเฉินบนทางหลวง</div>
+              <div class="text-[10px] text-slate-500">รถเสีย / ยางแตก / อุบัติเหตุ / น้ำมันรั่ว</div>
+            </div>
+          </div>
+          <button type="button" onclick="DriverApp.openSosModal()" class="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-md shadow-rose-500/20 active:scale-95 transition">
+            แจ้งเหตุ SOS &rarr;
+          </button>
+        </div>
+
+        <!-- Emergency Dispatcher Contact -->
+        <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between text-xs">
+          <div>
+            <div class="font-bold text-slate-800">ศูนย์ประสานงานขนส่ง 24 ชม.</div>
+            <div class="text-[10px] text-slate-500">โทรด่วนเจ้าหน้าที่ Dispatcher</div>
+          </div>
+          <a href="tel:038123456" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-xl shadow flex items-center gap-1.5 transition">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+            <span>โทรออก (038-123456)</span>
+          </a>
+        </div>
+
+      </div>
+
+      <!-- ==============================================================
+           TAB VIEW 2: ROUTE MAP (แผนที่เส้นทางแบบเต็มจอ)
+      ============================================================== -->
+      <div id="view-map" class="space-y-3 hidden">
+        <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <h3 class="text-xs font-bold text-slate-800">แผนที่เส้นทางและพิกัดรถสด (Live GPS)</h3>
+            <p class="text-[10px] text-slate-400" id="driver-map-subtitle">จุดรับ -> จุดส่งสินค้า</p>
+          </div>
+          <button onclick="DriverApp.recenterMap()" class="px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-bold border border-blue-200">
+            🎯 จัดกึ่งกลางรถ
+          </button>
+        </div>
+
+        <div class="h-[calc(100vh-250px)] rounded-2xl overflow-hidden border border-slate-200 shadow-inner relative" id="driver-live-map">
+          <!-- Leaflet Map Container -->
+        </div>
+      </div>
+
+      <!-- ==============================================================
+           TAB VIEW 3: HISTORY (ประวัติงานที่ทำเสร็จ)
+      ============================================================== -->
+      <div id="view-history" class="space-y-3 hidden">
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+          <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wide">สถิติผลงานคนขับประจำเดือน</h3>
+          <div class="grid grid-cols-3 gap-2 mt-3 text-center">
+            <div class="p-2.5 bg-blue-50 rounded-xl border border-blue-100">
+              <div class="text-[10px] text-blue-600 font-bold">งานสำเร็จ</div>
+              <div class="text-lg font-black text-slate-900 mt-0.5" id="driver-hist-trips">12</div>
+              <div class="text-[9px] text-slate-400">รอบวิ่ง</div>
+            </div>
+            <div class="p-2.5 bg-emerald-50 rounded-xl border border-emerald-100">
+              <div class="text-[10px] text-emerald-600 font-bold">ส่งมอบรวม</div>
+              <div class="text-lg font-black text-slate-900 mt-0.5" id="driver-hist-qty">384k</div>
+              <div class="text-[9px] text-slate-400">ลิตร/กก.</div>
+            </div>
+            <div class="p-2.5 bg-purple-50 rounded-xl border border-purple-100">
+              <div class="text-[10px] text-purple-600 font-bold">ความปลอดภัย</div>
+              <div class="text-lg font-black text-purple-700 mt-0.5">100%</div>
+              <div class="text-[9px] text-slate-400">ไร้อุบัติเหตุ</div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Safety Rules Alert (Dynamic per job) -->
-      <div id="driver-safety-box" class="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 flex items-start gap-3">
-        <span class="text-xl" id="driver-safety-icon">⚠️</span>
-        <div>
-          <div class="font-bold" id="driver-safety-title">แผนเวลาและกฎความปลอดภัยการขับขี่</div>
-          <div class="text-[11px] text-amber-800 mt-0.5 leading-relaxed" id="driver-safety-detail">
-            ห้ามขับรถติดต่อกันเกิน 4 ชั่วโมง หากครบ 4 ชม. ต้องจอดพักรถในจุดที่ปลอดภัยอย่างน้อย 30 นาที
+        <div class="space-y-2">
+          <div class="text-xs font-bold text-slate-700">รายการงานขนส่งที่เสร็จสิ้นแล้ว:</div>
+          <div id="driver-history-list" class="space-y-2">
+            <!-- Populated dynamically -->
           </div>
         </div>
       </div>
 
-      <!-- Emergency Dispatcher Contact -->
-      <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
-        <div>
-          <div class="text-xs font-bold text-slate-800">ศูนย์ประสานงานขนส่ง (Dispatcher)</div>
-          <div class="text-[11px] text-slate-500">โทรด่วน 24 ชั่วโมง</div>
-        </div>
-        <a href="tel:038123456" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow flex items-center gap-1.5 transition">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-          <span>โทรออก</span>
-        </a>
-      </div>
     </main>
 
-    <!-- Bottom Nav Bar -->
-    <nav class="fixed bottom-0 max-w-md w-full bg-white border-t border-slate-200 py-2.5 px-6 flex justify-between items-center text-xs font-semibold text-slate-500 z-30">
-      <a href="driver.html" class="text-blue-600 flex flex-col items-center gap-0.5">
+    <!-- Bottom Navigation Bar (Feature 1) -->
+    <nav class="fixed bottom-0 max-w-md w-full bg-white border-t border-slate-200 py-2 px-3 flex justify-around items-center text-xs font-semibold text-slate-500 z-30 shadow-lg">
+      <button type="button" onclick="DriverApp.switchView('task')" id="bnav-task" class="flex flex-col items-center gap-1 text-blue-600">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-        <span class="text-[10px]">งานของฉัน</span>
-      </a>
-      <a href="index.html" class="text-slate-600 hover:text-blue-600 flex flex-col items-center gap-0.5">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-        <span class="text-[10px]">กลับหน้าระบบหลัก</span>
-      </a>
-      <a href="track.html" class="text-slate-600 hover:text-blue-600 flex flex-col items-center gap-0.5">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-        <span class="text-[10px]">ติดตามพัสดุ</span>
-      </a>
+        <span class="text-[10px]">งานปัจจุบัน</span>
+      </button>
+
+      <button type="button" onclick="DriverApp.switchView('map')" id="bnav-map" class="flex flex-col items-center gap-1 text-slate-500 hover:text-blue-600">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+        <span class="text-[10px]">แผนที่นำทาง</span>
+      </button>
+
+      <button type="button" onclick="DriverApp.openSosModal()" class="flex flex-col items-center gap-1 text-rose-600 hover:text-rose-700">
+        <div class="w-8 h-8 rounded-full bg-rose-600 text-white flex items-center justify-center font-bold text-xs shadow-md shadow-rose-500/30 -mt-3">
+          🚨
+        </div>
+        <span class="text-[10px] font-bold text-rose-600">ฉุกเฉิน SOS</span>
+      </button>
+
+      <button type="button" onclick="DriverApp.switchView('history')" id="bnav-history" class="flex flex-col items-center gap-1 text-slate-500 hover:text-blue-600">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span class="text-[10px]">ประวัติงาน</span>
+      </button>
     </nav>
   </div>
 
+  <!-- Toast Notification Container -->
   <div id="toast-container" class="pointer-events-none"></div>
+
+  <!-- ==============================================================
+       MODAL: SMART STEP ADVANCE + PHOTO ATTACHMENT (Feature 3)
+  ============================================================== -->
+  <div id="modal-driver-advance" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4 animate-fadeIn">
+    <div class="bg-white rounded-3xl max-w-sm w-full max-h-[92vh] overflow-y-auto p-5 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b pb-3">
+        <div>
+          <span class="text-[10px] uppercase font-bold text-blue-600" id="sa-step-number">ขั้นตอนที่ 4/7</span>
+          <h3 class="text-sm font-bold text-slate-900" id="sa-step-title">ยืนยันการดำเนินงาน</h3>
+        </div>
+        <button onclick="DriverApp.closeSmartAdvanceModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">✕</button>
+      </div>
+
+      <div class="p-3 bg-blue-50/70 rounded-2xl border border-blue-100 text-xs space-y-1">
+        <div class="font-bold text-blue-900" id="sa-step-desc">บันทึกเวลาและพิกัด GPS ส่งเข้าศูนย์ควบคุม</div>
+        <div class="text-[10px] text-blue-700">ระบบจะประทับเวลาจริงและพิกัดดาวเทียมอัตโนมัติ</div>
+      </div>
+
+      <!-- Photo Attachment Requirement (If critical step) -->
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <label class="text-xs font-bold text-slate-800 flex items-center gap-1">
+            <span>📷 ถ่ายรูปหลักฐานขั้นตอนนี้</span>
+            <span class="text-[10px] text-rose-500 font-bold">*แนะนำ</span>
+          </label>
+        </div>
+
+        <!-- Camera / File Trigger -->
+        <div class="border border-dashed border-blue-300 bg-blue-50/40 rounded-xl p-3 text-center cursor-pointer" onclick="document.getElementById('sa-file-input').click()">
+          <input type="file" id="sa-file-input" accept="image/*" capture="environment" class="hidden" onchange="DriverApp.handleAdvancePhotoSelected(event)">
+          <div class="text-xs text-blue-700 font-bold">📷 กดเพื่อเปิดกล้อง / แนบรูปภาพ</div>
+          <div class="text-[10px] text-slate-400">ถ่ายรูปมิเตอร์, ด่านตรวจ, ซีลล็อก หรือใบ POD</div>
+        </div>
+
+        <!-- Quick Presets -->
+        <div class="bg-slate-50 p-2 rounded-xl border border-slate-200 text-[10px] space-y-1">
+          <div class="font-bold text-slate-600">⚡ หรือเลือกภาพจำลองเสมือนจริง:</div>
+          <div class="grid grid-cols-2 gap-1" id="sa-presets-grid">
+            <button type="button" onclick="DriverApp.selectAdvancePreset('fuel')" class="px-2 py-1 bg-white border border-slate-200 rounded text-left font-medium">⛽ มิเตอร์น้ำมัน</button>
+            <button type="button" onclick="DriverApp.selectAdvancePreset('customs')" class="px-2 py-1 bg-white border border-slate-200 rounded text-left font-medium">🛂 ด่านศุลกากร</button>
+            <button type="button" onclick="DriverApp.selectAdvancePreset('seal')" class="px-2 py-1 bg-white border border-slate-200 rounded text-left font-medium">🔒 ตรวจซีลนิรภัย</button>
+            <button type="button" onclick="DriverApp.selectAdvancePreset('pod')" class="px-2 py-1 bg-white border border-slate-200 rounded text-left font-medium">📝 เซ็นรับ POD</button>
+          </div>
+        </div>
+
+        <!-- Photo Preview Box -->
+        <div id="sa-preview-box" class="hidden p-2 bg-slate-900 rounded-xl flex items-center gap-2">
+          <img id="sa-preview-img" src="" alt="Preview" class="w-14 h-10 object-cover rounded">
+          <span class="text-[11px] text-emerald-400 font-bold">✓ แนบรูปหลักฐานแล้ว</span>
+        </div>
+      </div>
+
+      <!-- Measurement / Note Input -->
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">บันทึกเพิ่มเติม / เลขมาตรวัด / เลขซีล:</label>
+        <input type="text" id="sa-note-input" placeholder="เช่น มิเตอร์ 32,000 ลิตร หรือ ซีลสภาพสมบูรณ์" class="w-full text-xs border border-slate-300 rounded-xl p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+      </div>
+
+      <div class="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
+        <button type="button" onclick="DriverApp.closeSmartAdvanceModal()" class="px-3.5 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold">
+          ยกเลิก
+        </button>
+        <button type="button" onclick="DriverApp.confirmSmartAdvance()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          <span>ยืนยันและส่งรายงาน</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==============================================================
+       MODAL: REVERT / UNDO STEP CONFIRMATION (Feature 3 Safe Flow)
+  ============================================================== -->
+  <div id="modal-driver-revert" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4 animate-fadeIn">
+    <div class="bg-white rounded-3xl max-w-sm w-full max-h-[92vh] overflow-y-auto p-5 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b pb-2.5">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-base">
+            ↺
+          </div>
+          <div>
+            <h3 class="font-bold text-sm text-slate-900">ย้อนกลับไปขั้นตอนก่อนหน้า</h3>
+            <p class="text-[10px] text-slate-400">แก้ไขข้อผิดพลาดหรือเผลอกดปุ่มเร็วเกินไป</p>
+          </div>
+        </div>
+        <button onclick="DriverApp.closeRevertModal()" class="text-slate-400 hover:text-slate-600 p-1 text-sm font-bold">✕</button>
+      </div>
+
+      <!-- Current vs Target Step Notice -->
+      <div class="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-xs space-y-1.5">
+        <div class="flex items-center justify-between text-[11px] text-amber-900">
+          <span>ขั้นตอนปัจจุบัน:</span>
+          <strong id="revert-cur-step" class="font-bold text-slate-800">5. ออกเดินทาง</strong>
+        </div>
+        <div class="flex items-center justify-between text-[11px] text-emerald-800 pt-1 border-t border-amber-200/60">
+          <span>ถอยกลับสู่ขั้นตอน:</span>
+          <strong id="revert-target-step" class="font-bold text-emerald-700">4. รับสินค้า</strong>
+        </div>
+        <p class="text-[10px] text-amber-800/90 pt-1 flex items-center gap-1">
+          <span>⚠️</span>
+          <span>ระบบจะบันทึกประวัติย้อนกลับ (Audit Log) ในไทม์ไลน์โดยไม่ลบข้อมูลเดิม</span>
+        </p>
+      </div>
+
+      <!-- Select Revert Reason -->
+      <div class="space-y-1.5">
+        <label class="block text-xs font-bold text-slate-800">ระบุสาเหตุที่ต้องการย้อนกลับ:</label>
+        <select id="revert-reason-select" onchange="DriverApp.onRevertReasonChange()" class="w-full text-xs border border-slate-300 rounded-xl p-2.5 bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none">
+          <option value="มือลั่น / เผลอกดปุ่มเร็วเกินไปโดยไม่ได้ตั้งใจ">✋ มือลั่น / เผลอกดปุ่มเร็วเกินไป</option>
+          <option value="ยังไม่ได้ถ่ายรูปหลักฐาน (มิเตอร์น้ำมัน/ซีล/เอกสาร)">📷 ยังไม่ได้ถ่ายรูปหลักฐาน (มิเตอร์/ซีล)</option>
+          <option value="ยังโหลดสินค้าหรือตรวจปล่อยไม่เสร็จสมบูรณ์">📦 ยังโหลดสินค้า/ตรวจปล่อยไม่เสร็จ</option>
+          <option value="มีข้อมูลตัวเลข/เอกสารที่ต้องแก้ไขเพิ่มเติม">📝 มีข้อมูลที่ต้องแก้ไขเพิ่มเติม</option>
+          <option value="custom">✍️ สาเหตุอื่นๆ (พิมพ์เองด้านล่าง)</option>
+        </select>
+      </div>
+
+      <!-- Reason Detail Input -->
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">หมายเหตุเพิ่มเติม:</label>
+        <input type="text" id="revert-note-input" value="มือลั่น / เผลอกดปุ่มเร็วเกินไปโดยไม่ได้ตั้งใจ" placeholder="ระบุเหตุผล เช่น ลืมถ่ายรูปมิเตอร์..." class="w-full text-xs border border-slate-300 rounded-xl p-2.5 focus:ring-2 focus:ring-amber-500 focus:outline-none">
+      </div>
+
+      <!-- Action buttons -->
+      <div class="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
+        <button type="button" onclick="DriverApp.closeRevertModal()" class="px-3.5 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold">
+          ยกเลิก (คงสถานะเดิม)
+        </button>
+        <button type="button" onclick="DriverApp.confirmRevertStep()" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-md shadow-amber-500/20 transition flex items-center gap-1.5">
+          <span>↺ ยืนยันย้อนกลับขั้นตอน</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==============================================================
+       MODAL: EMERGENCY SOS & INCIDENT REPORT (Feature 4)
+  ============================================================== -->
+  <div id="modal-driver-sos" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4 animate-fadeIn">
+    <div class="bg-white rounded-3xl max-w-sm w-full max-h-[92vh] overflow-y-auto p-5 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b pb-2.5">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center font-bold text-base">
+            🚨
+          </div>
+          <div>
+            <h3 class="font-bold text-sm text-slate-900">แจ้งเหตุฉุกเฉิน (SOS Alert)</h3>
+            <p class="text-[10px] text-slate-400">ส่งสัญญาณและพิกัดสดเข้าศูนย์ควบคุมทันที</p>
+          </div>
+        </div>
+        <button onclick="DriverApp.closeSosModal()" class="text-slate-400 hover:text-slate-600 p-1 text-sm font-bold">✕</button>
+      </div>
+
+      <!-- Quick Emergency Types -->
+      <div class="space-y-1.5">
+        <label class="block text-xs font-bold text-slate-800">เลือกประเภทสถานการณ์ฉุกเฉิน:</label>
+        <div class="grid grid-cols-2 gap-1.5" id="sos-type-buttons">
+          <button type="button" onclick="DriverApp.setSosType('breakdown')" data-type="breakdown" class="sos-btn p-2 rounded-xl border text-xs font-bold text-left border-rose-500 bg-rose-50 text-rose-800 flex items-center gap-2">
+            <span>⚠️</span> <span>รถเสีย/ยางแตก</span>
+          </button>
+          <button type="button" onclick="DriverApp.setSosType('accident')" data-type="accident" class="sos-btn p-2 rounded-xl border text-xs font-bold text-left border-slate-200 bg-white text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+            <span>💥</span> <span>อุบัติเหตุเฉี่ยวชน</span>
+          </button>
+          <button type="button" onclick="DriverApp.setSosType('leak')" data-type="leak" class="sos-btn p-2 rounded-xl border text-xs font-bold text-left border-slate-200 bg-white text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+            <span>🛢️</span> <span>สารเคมี/วาล์วรั่ว</span>
+          </button>
+          <button type="button" onclick="DriverApp.setSosType('traffic')" data-type="traffic" class="sos-btn p-2 rounded-xl border text-xs font-bold text-left border-slate-200 bg-white text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+            <span>🛑</span> <span>ทางปิด/น้ำท่วม</span>
+          </button>
+        </div>
+        <input type="hidden" id="sos-selected-type" value="breakdown">
+      </div>
+
+      <!-- Note / Remarks -->
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">รายละเอียดเพิ่มเติม:</label>
+        <input type="text" id="sos-detail-input" placeholder="เช่น ยางหลังแตก กม. 108 หรือ กีดขวางทางเลนซ้าย" class="w-full text-xs border border-slate-300 rounded-xl p-2.5 focus:ring-2 focus:ring-rose-500 focus:outline-none">
+      </div>
+
+      <!-- GPS Stamp info -->
+      <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-[11px] text-slate-600 space-y-1">
+        <div class="flex justify-between"><span>พิกัด GPS ปัจจุบัน:</span> <strong class="font-mono text-rose-600" id="sos-gps-coords">13.1205° N, 100.9142° E</strong></div>
+        <div class="flex justify-between"><span>ทะเบียนรถ:</span> <strong class="font-mono text-slate-800" id="sos-plate-text">-</strong></div>
+      </div>
+
+      <!-- Emergency Hotlines Quick Dial -->
+      <div class="pt-2 border-t border-slate-100 space-y-1.5">
+        <div class="text-[10px] font-bold text-slate-500 uppercase">เบอร์โทรติดต่อฉุกเฉินด่วน:</div>
+        <div class="grid grid-cols-3 gap-1 text-[11px] text-center">
+          <a href="tel:191" class="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg font-bold text-slate-800">
+            📞 191
+          </a>
+          <a href="tel:1193" class="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg font-bold text-slate-800">
+            🚓 1193 (ทล.)
+          </a>
+          <a href="tel:038123456" class="p-1.5 bg-rose-100 hover:bg-rose-200 rounded-lg font-bold text-rose-800">
+            🏢 ศูนย์ 24 ชม.
+          </a>
+        </div>
+      </div>
+
+      <div class="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
+        <button type="button" onclick="DriverApp.closeSosModal()" class="px-3.5 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold">
+          ยกเลิก
+        </button>
+        <button type="button" onclick="DriverApp.submitEmergencySos()" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-md shadow-rose-500/20 transition flex items-center gap-1.5">
+          <span>🚨 ยืนยันส่งสัญญาณฉุกเฉิน</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Standalone Photo Upload Modal -->
+  <div id="modal-driver-upload" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full max-h-[90vh] overflow-y-auto p-5 shadow-2xl space-y-3.5">
+      <div class="flex items-center justify-between border-b pb-2.5">
+        <div class="flex items-center gap-2">
+          <span class="text-base">📷</span>
+          <h3 class="font-bold text-sm text-slate-900">ถ่ายรูปรายงานหลักฐาน</h3>
+        </div>
+        <button onclick="DriverApp.closeUploadModal()" class="text-slate-400 hover:text-slate-600 text-sm font-bold">✕</button>
+      </div>
+
+      <form onsubmit="DriverApp.submitUpload(event)" class="space-y-3">
+        <div>
+          <label class="block text-[11px] font-bold text-slate-700 mb-1">ขั้นตอน:</label>
+          <select id="du-step" class="w-full text-xs border border-slate-300 rounded-xl p-2 bg-white"></select>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-slate-700 mb-1">หมวดหมู่หลักฐาน:</label>
+          <div class="flex flex-wrap gap-1.5" id="du-cat-buttons">
+            <button type="button" onclick="DriverApp.setCategory('fuel')" data-cat="fuel" class="cat-pill px-2.5 py-1 rounded-lg text-xs font-bold border border-blue-500 bg-blue-50 text-blue-700">⛽ เติมน้ำมัน</button>
+            <button type="button" onclick="DriverApp.setCategory('customs')" data-cat="customs" class="cat-pill px-2.5 py-1 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700">🛂 ข้ามแดน</button>
+            <button type="button" onclick="DriverApp.setCategory('seal')" data-cat="seal" class="cat-pill px-2.5 py-1 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700">🔒 ซีลนิรภัย</button>
+            <button type="button" onclick="DriverApp.setCategory('inspection')" data-cat="inspection" class="cat-pill px-2.5 py-1 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700">🔍 ตรวจรถ</button>
+            <button type="button" onclick="DriverApp.setCategory('delivery')" data-cat="delivery" class="cat-pill px-2.5 py-1 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700">📝 POD</button>
+          </div>
+          <input type="hidden" id="du-category" value="fuel">
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-slate-700 mb-1">หมายเหตุ / คำอธิบาย:</label>
+          <input type="text" id="du-caption" placeholder="เช่น มิเตอร์เติมน้ำมัน 32,000 ลิตร หรือจุดตรวจข้ามแดน" class="w-full text-xs border border-slate-300 rounded-xl p-2" required>
+        </div>
+
+        <div class="space-y-1.5">
+          <label class="block text-[11px] font-bold text-slate-700">ถ่ายรูป หรือเลือกภาพจำลอง:</label>
+          <div class="border border-dashed border-blue-300 bg-blue-50/50 rounded-xl p-2.5 text-center cursor-pointer" onclick="document.getElementById('du-file-input').click()">
+            <input type="file" id="du-file-input" accept="image/*" capture="environment" class="hidden" onchange="DriverApp.handleFileSelected(event)">
+            <span class="text-xs text-blue-700 font-bold">📷 กดเพื่อเปิดกล้องมือถือ / เลือกรูปภาพ</span>
+          </div>
+
+          <div class="bg-slate-50 p-2 rounded-xl border border-slate-200 text-[10px] space-y-1">
+            <div class="font-bold text-slate-600">⚡ หรือเลือกภาพจำลองทันที:</div>
+            <div class="grid grid-cols-2 gap-1">
+              <button type="button" onclick="DriverApp.selectMockPreset('fuel')" class="px-2 py-1 bg-white border border-slate-200 rounded text-left font-medium">⛽ มิเตอร์น้ำมัน</button>
+              <button type="button" onclick="DriverApp.selectMockPreset('customs')" class="px-2 py-1 bg-white border border-slate-200 rounded text-left font-medium">🛂 ด่านศุลกากร</button>
+              <button type="button" onclick="DriverApp.selectMockPreset('seal')" class="px-2 py-1 bg-white border border-slate-200 rounded text-left font-medium">🔒 ซีลล็อกวาล์ว</button>
+              <button type="button" onclick="DriverApp.selectMockPreset('pod')" class="px-2 py-1 bg-white border border-slate-200 rounded text-left font-medium">📝 เซ็นรับ POD</button>
+            </div>
+          </div>
+
+          <div id="du-preview-box" class="hidden p-2 bg-slate-900 rounded-xl flex items-center gap-2">
+            <img id="du-preview-img" src="" alt="Preview" class="w-14 h-10 object-cover rounded">
+            <span class="text-[11px] text-emerald-400 font-bold">✓ พร้อมแนบรูป</span>
+          </div>
+        </div>
+
+        <div class="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
+          <button type="button" onclick="DriverApp.closeUploadModal()" class="px-3 py-1.5 border border-slate-200 text-slate-600 rounded-lg text-xs font-bold">
+            ยกเลิก
+          </button>
+          <button type="submit" class="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold shadow transition">
+            บันทึกรูปหลักฐาน
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Lightbox Viewer Modal -->
+  <div id="modal-driver-lightbox" class="fixed inset-0 bg-slate-900/90 backdrop-blur z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full overflow-hidden shadow-2xl flex flex-col">
+      <div class="p-3 bg-slate-950 flex justify-center relative">
+        <img id="dl-img" src="" alt="Photo" class="max-h-64 object-contain rounded-lg">
+        <button onclick="DriverApp.closePhotoViewer()" class="absolute top-2 right-2 w-7 h-7 bg-white/20 text-white rounded-full flex items-center justify-center text-sm font-bold">✕</button>
+      </div>
+      <div class="p-4 space-y-2 text-xs">
+        <div class="text-[10px] text-blue-600 font-bold uppercase" id="dl-step">ขั้นตอน: -</div>
+        <h3 class="font-bold text-slate-900 text-sm" id="dl-title">-</h3>
+        <p class="text-slate-600 bg-slate-50 p-2 rounded-lg text-[11px]" id="dl-caption">-</p>
+        <div class="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-100">
+          <span id="dl-coords">GPS Logged</span>
+          <span id="dl-time">00:00 น.</span>
+        </div>
+      </div>
+      <div class="p-3 bg-slate-50 border-t border-slate-100">
+        <button onclick="DriverApp.closePhotoViewer()" class="w-full py-2 bg-slate-800 text-white rounded-xl text-xs font-bold">ปิดหน้าต่าง</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Scripts -->
   <script src="js/data.js"></script>
@@ -167,25 +658,50 @@
   <script>
     const DriverApp = {
       activeDriverId: "D-01",
+      currentView: "task",
+      leafMap: null,
+      mapMarkers: [],
 
       init() {
-        this.populateDriverSelector();
+        const u = window.Auth ? window.Auth.getCurrentUser() : null;
+        if (u && u.driverId) {
+          this.activeDriverId = u.driverId;
+        }
+
+        const driver = window.store.getDriver(this.activeDriverId) || { name: u?.name || "นายสุเทพ โพธิ์ศรี", vehiclePlate: u?.vehiclePlate || "ชบ.74-0549" };
+        const elName = document.getElementById("driver-logged-name");
+        if (elName) elName.textContent = driver.name;
+        const elPlate = document.getElementById("driver-logged-plate");
+        if (elPlate) elPlate.textContent = driver.vehiclePlate;
+
         this.renderDriverData();
+        this.renderHistoryData();
+        this.checkExistingSosAlert();
 
         window.store.subscribe(() => {
           this.renderDriverData();
+          this.renderHistoryData();
         });
       },
 
-      populateDriverSelector() {
-        const sel = document.getElementById("driver-selector");
-        const drivers = window.store.getDrivers();
-        sel.innerHTML = drivers.map(d => `<option value="${d.id}">${d.name} (${d.vehiclePlate})</option>`).join("");
-        sel.value = this.activeDriverId;
-        sel.onchange = (e) => {
-          this.activeDriverId = e.target.value;
-          this.renderDriverData();
-        };
+      switchView(viewName) {
+        this.currentView = viewName;
+        document.getElementById("view-task").classList.toggle("hidden", viewName !== "task");
+        document.getElementById("view-map").classList.toggle("hidden", viewName !== "map");
+        document.getElementById("view-history").classList.toggle("hidden", viewName !== "history");
+
+        // Update Nav highlighting
+        const navItems = { task: "bnav-task", map: "bnav-map", history: "bnav-history" };
+        Object.keys(navItems).forEach(k => {
+          const btn = document.getElementById(navItems[k]);
+          if (btn) {
+            btn.className = (k === viewName) ? "flex flex-col items-center gap-1 text-blue-600 font-bold" : "flex flex-col items-center gap-1 text-slate-500 hover:text-blue-600";
+          }
+        });
+
+        if (viewName === "map") {
+          setTimeout(() => this.initOrUpdateLeafletMap(), 150);
+        }
       },
 
       renderDriverData() {
@@ -197,8 +713,8 @@
         if (!activeJob) return;
 
         const v = window.store.getVehicle(activeJob.vehicleId) || { plate: "-" };
-        const pLoc = window.store.getLocation(activeJob.pickupLocId) || { name: "-", contact: "-" };
-        const dLoc = window.store.getLocation(activeJob.dropoffLocId) || { name: "-", contact: "-" };
+        const pLoc = window.store.getLocation(activeJob.pickupLocId) || { name: "-", province: "-", contact: "038-683-111", lat: 12.71, lng: 101.16 };
+        const dLoc = window.store.getLocation(activeJob.dropoffLocId) || { name: "-", province: "-", contact: "038-408-500", lat: 13.11, lng: 100.91 };
         const flow = window.store.getStatusFlow(activeJob);
         const status = window.store.getStatusMeta(activeJob.currentStatusId, activeJob) || { name: "-" };
 
@@ -208,85 +724,801 @@
         document.getElementById("driver-vehicle-plate").textContent = v.plate;
         document.getElementById("driver-product-info").textContent = `${activeJob.productType} (${activeJob.productQty})`;
         document.getElementById("driver-eta-info").textContent = activeJob.eta || "-";
-        document.getElementById("driver-pickup-name").textContent = pLoc.name;
-        document.getElementById("driver-pickup-contact").textContent = `ติดต่อ: ${pLoc.contact || "-"}`;
-        document.getElementById("driver-dropoff-name").textContent = dLoc.name;
-        document.getElementById("driver-dropoff-contact").textContent = `ติดต่อ: ${dLoc.contact || "-"}`;
 
-        // Dynamic Trip & Safety Rest Alert per Job
-        const tripPlan = window.ETAEngine ? window.ETAEngine.getJobTripPlan(activeJob) : null;
-        const delivDist = activeJob.routeDistanceKm || tripPlan?.deliveryDistanceKm || 0;
-        const restCount = activeJob.restCount ?? tripPlan?.restStopsCount ?? (activeJob.hasRestStop ? 1 : 0);
-        const restMins = activeJob.restDurationMinutes ?? tripPlan?.totalRestMinutes ?? 0;
-
-        const safetyBox = document.getElementById("driver-safety-box");
-        const safetyIcon = document.getElementById("driver-safety-icon");
-        const safetyTitle = document.getElementById("driver-safety-title");
-        const safetyDetail = document.getElementById("driver-safety-detail");
-        if (safetyBox && safetyDetail) {
-          if (restCount > 0 || restMins > 0) {
-            safetyBox.className = "p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 flex items-start gap-3";
-            if (safetyIcon) safetyIcon.textContent = "⚠️";
-            if (safetyTitle) safetyTitle.textContent = `แจ้งเตือนพักรถตามกฎ 4 ชม. (รอบนี้พัก ${restCount || 1} ครั้ง)`;
-            safetyDetail.innerHTML = `ระยะส่ง <strong>${delivDist} กม.</strong> ต้องจอดพักในจุดที่ปลอดภัยรวม <strong>${restMins || 30} นาที</strong> เพื่อรักษาเวลาถึงปลายทางตาม ETA (<strong>${activeJob.eta || "-"}</strong>)`;
-          } else {
-            safetyBox.className = "p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-900 flex items-start gap-3";
-            if (safetyIcon) safetyIcon.textContent = "🛡️";
-            if (safetyTitle) safetyTitle.textContent = "รอบงานนี้ระยะสั้น (ขับต่อเนื่องไม่ถึง 4 ชม.)";
-            safetyDetail.innerHTML = `ระยะส่ง <strong>${delivDist} กม.</strong> ไม่ติดบังคับพักระหว่างทาง แต่หากรู้สึกเหนื่อยล้าสามารถจอดพักได้ทันที (ETA: <strong>${activeJob.eta || "-"}</strong>)`;
-          }
+        // Update live GPS coordinates in SOS modal
+        const elSosCoords = document.getElementById("sos-gps-coords");
+        if (elSosCoords) {
+          elSosCoords.textContent = (v && typeof v.lat === "number" && typeof v.lng === "number")
+            ? `${v.lat.toFixed(4)}° N, ${v.lng.toFixed(4)}° E`
+            : "13.2083° N, 101.0000° E";
         }
 
-        // Tag: Domestic vs. Cross-Border
-        const tagType = document.getElementById("driver-transport-type-tag");
-        if (tagType) {
-          if (activeJob.isCrossBorder) {
-            tagType.className = "px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-500/30 text-purple-200 border border-purple-400/30";
-            tagType.textContent = "🌐 ข้ามแดน (8 ขั้นตอน)";
-          } else {
-            tagType.className = "px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-500/30 text-blue-200";
-            tagType.textContent = "🇹🇭 ในประเทศ (7 ขั้นตอน)";
-          }
-        }
+        // Pickup / Dropoff details + Navigation links (Feature 2)
+        document.getElementById("driver-pickup-name").textContent = `${pLoc.name} (${pLoc.province || "-"})`;
+        document.getElementById("driver-pickup-contact").textContent = `โทรติดต่อ: ${pLoc.contact || "-"}`;
+        const btnPNav = document.getElementById("btn-pickup-nav");
+        if (btnPNav) btnPNav.href = `https://www.google.com/maps/dir/?api=1&destination=${pLoc.lat},${pLoc.lng}`;
+        const btnPCall = document.getElementById("btn-pickup-call");
+        if (btnPCall) btnPCall.href = `tel:${(pLoc.contact || "").replace(/[^0-9]/g, "")}`;
 
-        // Cross-Border Card
+        document.getElementById("driver-dropoff-name").textContent = `${dLoc.name} (${dLoc.province || "-"})`;
+        document.getElementById("driver-dropoff-contact").textContent = `โทรติดต่อ: ${dLoc.contact || "-"}`;
+        const btnDNav = document.getElementById("btn-dropoff-nav");
+        if (btnDNav) btnDNav.href = `https://www.google.com/maps/dir/?api=1&destination=${dLoc.lat},${dLoc.lng}`;
+        const btnDCall = document.getElementById("btn-dropoff-call");
+        if (btnDCall) btnDCall.href = `tel:${(dLoc.contact || "").replace(/[^0-9]/g, "")}`;
+
+        // Cross border card
         const cbCard = document.getElementById("driver-cb-card");
         if (cbCard) {
           if (activeJob.isCrossBorder) {
             cbCard.classList.remove("hidden");
-            const elPermit = document.getElementById("driver-cb-permit");
-            if (elPermit) elPermit.textContent = activeJob.customsPermitNo || "CB-THKH-2026/0491";
-            const elDec = document.getElementById("driver-cb-declaration");
-            if (elDec) elDec.textContent = activeJob.customsDeclarationNo || "กศก.120-690214";
-            const elSeal = document.getElementById("driver-cb-seal");
-            if (elSeal) elSeal.textContent = activeJob.customsSealNo || "SEAL-CUSTOMS-8821";
-            const elCheckpoint = document.getElementById("driver-cb-checkpoint");
-            if (elCheckpoint && activeJob.customsCheckpoint) elCheckpoint.textContent = activeJob.customsCheckpoint;
+            document.getElementById("driver-cb-permit").textContent = activeJob.customsPermitNo || "CB-THKH-2026/0491";
+            document.getElementById("driver-cb-declaration").textContent = activeJob.customsDeclarationNo || "กศก.120-690214";
+            document.getElementById("driver-cb-seal").textContent = activeJob.customsSealNo || "SEAL-CUSTOMS-8821";
           } else {
             cbCard.classList.add("hidden");
           }
         }
 
+        // Flow progress calculation
+        const pct = Math.round((activeJob.currentStatusId / flow.length) * 100);
+        const elProgress = document.getElementById("driver-flow-progress");
+        if (elProgress) {
+          elProgress.textContent = `ขั้นตอนที่ ${activeJob.currentStatusId}/${flow.length} (${pct}%)`;
+        }
+
+        // Full Steps Timeline List rendering
+        const stepsListEl = document.getElementById("driver-full-steps-list");
+        if (stepsListEl) {
+          stepsListEl.innerHTML = flow.map(s => {
+            const isCompleted = s.id < activeJob.currentStatusId;
+            const isCurrent = s.id === activeJob.currentStatusId;
+            const isFuture = s.id > activeJob.currentStatusId;
+
+            // Find matching timeline entries for this step
+            const timelineEntry = (activeJob.timeline || []).slice().reverse().find(t => t.statusId === s.id && !t.isReverted);
+            const stepPhotos = timelineEntry?.photos || [];
+
+            if (isCompleted) {
+              return `
+                <div class="p-2.5 bg-emerald-50/60 rounded-xl border border-emerald-200/80 flex items-start gap-2.5 transition">
+                  <div class="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-sm mt-0.5">
+                    ✓
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between">
+                      <span class="font-bold text-emerald-950 text-xs">${s.id}. ${s.name}</span>
+                      <span class="text-[10px] text-emerald-700 font-mono font-medium">${timelineEntry?.time ? timelineEntry.time + ' น.' : 'เสร็จแล้ว'}</span>
+                    </div>
+                    <div class="text-[11px] text-emerald-800/80 truncate mt-0.5">${timelineEntry?.note || s.desc || "ดำเนินการเรียบร้อย"}</div>
+                    ${stepPhotos.length > 0 ? `
+                      <div class="mt-1.5 flex items-center gap-1.5">
+                        <button type="button" onclick="DriverApp.openPhotosForStep(${s.id})" class="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-[10px] font-bold rounded-md border border-emerald-300 transition">
+                          <span>📷 ดูภาพหลักฐาน (${stepPhotos.length} รูป)</span>
+                        </button>
+                      </div>
+                    ` : ''}
+                  </div>
+                </div>
+              `;
+            } else if (isCurrent) {
+              return `
+                <div class="p-3 bg-blue-50/70 rounded-xl border-2 border-blue-500 shadow-sm space-y-2 relative overflow-hidden transition">
+                  <div class="absolute top-0 right-0 px-2 py-0.5 bg-blue-600 text-white text-[9px] font-bold rounded-bl-lg uppercase tracking-wider">
+                    กำลังดำเนินการ
+                  </div>
+                  <div class="flex items-start gap-2.5">
+                    <div class="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-sm animate-pulse mt-0.5">
+                      ${s.id}
+                    </div>
+                    <div class="flex-1 min-w-0 pr-16">
+                      <div class="font-bold text-blue-950 text-xs">${s.id}. ${s.name}</div>
+                      <div class="text-[11px] text-blue-800 mt-0.5">${s.desc}</div>
+                    </div>
+                  </div>
+                  <div class="pt-2 border-t border-blue-200/60 flex items-center justify-between text-[11px]">
+                    <span class="text-blue-900 font-medium">
+                      ${stepPhotos.length > 0 ? `📷 แนบหลักฐานแล้ว <strong class="text-emerald-700">${stepPhotos.length} รูป</strong>` : `⚠️ ยังไม่ได้แนบรูปถ่าย`}
+                    </span>
+                    <button type="button" onclick="DriverApp.openUploadForCurrentStep()" class="px-2.5 py-1 bg-white hover:bg-blue-100 text-blue-700 border border-blue-300 rounded-lg text-[10px] font-bold shadow-sm transition">
+                      + ถ่ายรูปขั้นตอนนี้
+                    </button>
+                  </div>
+                </div>
+              `;
+            } else {
+              return `
+                <div class="p-2.5 bg-slate-50/70 rounded-xl border border-slate-200/70 flex items-start gap-2.5 opacity-60">
+                  <div class="w-6 h-6 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                    ${s.id}
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="font-medium text-slate-700 text-xs">${s.id}. ${s.name}</div>
+                    <div class="text-[10px] text-slate-400 truncate mt-0.5">${s.desc}</div>
+                  </div>
+                </div>
+              `;
+            }
+          }).join("");
+        }
+
+        // Advance button title
         const btnAdvance = document.getElementById("btn-driver-advance");
         if (activeJob.currentStatusId < flow.length) {
           const nextStatus = window.store.getStatusMeta(activeJob.currentStatusId + 1, activeJob);
           btnAdvance.disabled = false;
           if (nextStatus.key === "border_customs") {
             btnAdvance.className = "w-full py-3.5 bg-purple-600 hover:bg-purple-700 active:scale-98 text-white rounded-xl text-sm font-bold shadow-md shadow-purple-500/20 flex items-center justify-center gap-2 transition";
-            btnAdvance.innerHTML = `<span>ยื่นเอกสารด่านข้ามแดน: <strong>${nextStatus.name}</strong></span> &rarr;`;
+            btnAdvance.innerHTML = `<span>ยืนยันจบขั้นตอนนี้ & ยื่นเอกสารด่าน: <strong>${nextStatus.name}</strong></span> &rarr;`;
           } else {
             btnAdvance.className = "w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 transition";
-            btnAdvance.innerHTML = `<span>ยืนยันขั้นตอน: <strong>${nextStatus.name}</strong></span> &rarr;`;
+            btnAdvance.innerHTML = `<span>ยืนยันจบขั้นตอนนี้ & ไปสู่: <strong>${nextStatus.name}</strong></span> &rarr;`;
           }
-          btnAdvance.onclick = () => {
-            window.store.updateJobStatus(activeJob.id, activeJob.currentStatusId + 1, "คนขับกดยืนยันผ่านหน้าจอมือถือ", `${driver.name} (คนขับ)`);
-            alert(`อัปเดตสถานะเป็น "${nextStatus.name}" เรียบร้อยแล้ว`);
-          };
         } else {
           btnAdvance.disabled = true;
           btnAdvance.className = "w-full py-3.5 bg-slate-300 text-slate-500 rounded-xl text-sm font-bold cursor-not-allowed flex items-center justify-center gap-2";
           btnAdvance.innerHTML = `<span>งานขนส่งนี้เสร็จสิ้นสมบูรณ์แล้ว</span>`;
         }
+
+        // Safety Revert button logic
+        const btnRevert = document.getElementById("btn-driver-revert");
+        const txtRevert = document.getElementById("btn-driver-revert-text");
+        if (btnRevert && txtRevert) {
+          if (activeJob.currentStatusId > 1) {
+            const prevStatus = window.store.getStatusMeta(activeJob.currentStatusId - 1, activeJob);
+            btnRevert.disabled = false;
+            btnRevert.className = "w-full py-2.5 px-3 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-98 shadow-sm cursor-pointer";
+            txtRevert.textContent = `↺ กดย้อนกลับไป: "${prevStatus.name}" (กรณีเผลอกดผิด)`;
+          } else {
+            btnRevert.disabled = true;
+            btnRevert.className = "w-full py-2.5 px-3 bg-slate-100 text-slate-400 border border-slate-200 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 cursor-not-allowed opacity-60";
+            txtRevert.textContent = "อยู่ที่ขั้นตอนเริ่มต้น (ไม่สามารถย้อนกลับได้)";
+          }
+        }
+
+        // Render Photos Gallery
+        this.renderEvidencePhotos(activeJob);
+      },
+
+      /* ==============================================================
+         Revert / Undo Step Confirmation & Handling
+      ============================================================== */
+      openRevertModal() {
+        const jobs = window.store.getJobs();
+        const activeJob = jobs.find(j => j.driverId === this.activeDriverId && !window.store.isJobCompleted(j)) ||
+                          jobs.find(j => j.driverId === this.activeDriverId) || jobs[0];
+        if (!activeJob) return;
+
+        if (activeJob.currentStatusId <= 1) {
+          this.showToast("อยู่ที่ขั้นตอนแรกสุดแล้ว ไม่สามารถย้อนกลับได้", "info");
+          return;
+        }
+
+        const curStatus = window.store.getStatusMeta(activeJob.currentStatusId, activeJob);
+        const prevStatus = window.store.getStatusMeta(activeJob.currentStatusId - 1, activeJob);
+
+        document.getElementById("revert-cur-step").textContent = `${curStatus.id}. ${curStatus.name}`;
+        document.getElementById("revert-target-step").textContent = `${prevStatus.id}. ${prevStatus.name}`;
+
+        const sel = document.getElementById("revert-reason-select");
+        if (sel) sel.selectedIndex = 0;
+        const input = document.getElementById("revert-note-input");
+        if (input) input.value = sel ? sel.value : "มือลั่น / เผลอกดปุ่มเร็วเกินไปโดยไม่ได้ตั้งใจ";
+
+        document.getElementById("modal-driver-revert").classList.remove("hidden");
+      },
+
+      closeRevertModal() {
+        document.getElementById("modal-driver-revert").classList.add("hidden");
+      },
+
+      onRevertReasonChange() {
+        const sel = document.getElementById("revert-reason-select");
+        const input = document.getElementById("revert-note-input");
+        if (!sel || !input) return;
+        if (sel.value === "custom") {
+          input.value = "";
+          input.placeholder = "พิมพ์ระบุสาเหตุที่ต้องการย้อนกลับ...";
+          input.focus();
+        } else {
+          input.value = sel.value;
+        }
+      },
+
+      confirmRevertStep() {
+        const jobs = window.store.getJobs();
+        const activeJob = jobs.find(j => j.driverId === this.activeDriverId && !window.store.isJobCompleted(j)) ||
+                          jobs.find(j => j.driverId === this.activeDriverId) || jobs[0];
+        const driver = window.store.getDriver(this.activeDriverId);
+        if (!activeJob || activeJob.currentStatusId <= 1) return;
+
+        const reason = document.getElementById("revert-note-input")?.value ||
+                       document.getElementById("revert-reason-select")?.value ||
+                       "คนขับกดย้อนกลับขั้นตอนเนื่องจากกดผิด";
+
+        const prevStatus = window.store.getStatusMeta(activeJob.currentStatusId - 1, activeJob);
+        const success = window.store.revertJobStatus(
+          activeJob.id,
+          reason,
+          `${driver ? driver.name : "คนขับรถ"} (Driver Mobile App)`
+        );
+
+        if (success) {
+          this.closeRevertModal();
+          this.showToast(`ย้อนกลับสู่ขั้นตอน "${prevStatus.name}" เรียบร้อยแล้ว`, "success");
+          this.renderDriverData();
+        } else {
+          this.showToast("ไม่สามารถย้อนกลับขั้นตอนได้", "error");
+        }
+      },
+
+      openUploadForCurrentStep() {
+        const jobs = window.store.getJobs();
+        const activeJob = jobs.find(j => j.driverId === this.activeDriverId && !window.store.isJobCompleted(j)) ||
+                          jobs.find(j => j.driverId === this.activeDriverId) || jobs[0];
+        if (!activeJob) return;
+
+        this.openUploadModal();
+        const selStep = document.getElementById("du-step");
+        if (selStep) selStep.value = activeJob.currentStatusId;
+      },
+
+      openPhotosForStep(statusId) {
+        const jobs = window.store.getJobs();
+        const activeJob = jobs.find(j => j.driverId === this.activeDriverId && !window.store.isJobCompleted(j)) ||
+                          jobs.find(j => j.driverId === this.activeDriverId) || jobs[0];
+        if (!activeJob) return;
+
+        const targetEntry = (activeJob.timeline || []).find(t => t.statusId === statusId && t.photos && t.photos.length > 0);
+        if (targetEntry && targetEntry.photos.length > 0) {
+          const photo = targetEntry.photos[0];
+          const modal = document.getElementById("modal-driver-lightbox");
+          if (modal) {
+            document.getElementById("dl-img").src = photo.url;
+            document.getElementById("dl-title").textContent = photo.title || targetEntry.name;
+            document.getElementById("dl-step").textContent = `ขั้นตอน: ${targetEntry.name || "-"}`;
+            document.getElementById("dl-time").textContent = `${photo.timestamp} น.`;
+            document.getElementById("dl-coords").textContent = photo.coords || "GPS Logged";
+            document.getElementById("dl-caption").textContent = photo.caption || "-";
+            modal.classList.remove("hidden");
+          }
+        } else {
+          this.showToast("ยังไม่มีรูปถ่ายสำหรับขั้นตอนนี้", "info");
+        }
+      },
+
+      /* ==============================================================
+         Feature 3: Smart Step Advance Modal with Photo Integration
+      ============================================================== */
+      openSmartAdvanceModal() {
+        const jobs = window.store.getJobs();
+        const activeJob = jobs.find(j => j.driverId === this.activeDriverId && !window.store.isJobCompleted(j)) ||
+                          jobs.find(j => j.driverId === this.activeDriverId) || jobs[0];
+        if (!activeJob) return;
+
+        const flow = window.store.getStatusFlow(activeJob);
+        if (activeJob.currentStatusId >= flow.length) {
+          this.showToast("งานขนส่งรอบนี้เสร็จสิ้นสมบูรณ์แล้ว", "info");
+          return;
+        }
+
+        const nextId = activeJob.currentStatusId + 1;
+        const nextStatus = window.store.getStatusMeta(nextId, activeJob);
+
+        document.getElementById("sa-step-number").textContent = `ขั้นตอนที่ ${nextId}/${flow.length}: ${nextStatus.name}`;
+        document.getElementById("sa-step-title").textContent = `ยืนยันอัปเดตเป็น: "${nextStatus.name}"`;
+        document.getElementById("sa-step-desc").textContent = nextStatus.desc || "ระบบจะส่งพิกัด GPS และเวลาประทับไปยังศูนย์ควบคุม";
+
+        this.pendingAdvancePhotoUrl = null;
+        document.getElementById("sa-preview-box").classList.add("hidden");
+        document.getElementById("sa-file-input").value = "";
+        document.getElementById("sa-note-input").value = "";
+
+        // Auto select mock preset based on step
+        if (nextStatus.key === "border_customs") {
+          this.selectAdvancePreset("customs");
+        } else if (nextId === 4) {
+          this.selectAdvancePreset("fuel");
+        } else if (nextId === 1 || nextId === 3) {
+          this.selectAdvancePreset("seal");
+        } else if (nextId >= 6) {
+          this.selectAdvancePreset("pod");
+        }
+
+        document.getElementById("modal-driver-advance").classList.remove("hidden");
+      },
+
+      closeSmartAdvanceModal() {
+        document.getElementById("modal-driver-advance").classList.add("hidden");
+      },
+
+      handleAdvancePhotoSelected(event) {
+        const file = event.target?.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          this.pendingAdvancePhotoUrl = e.target.result;
+          document.getElementById("sa-preview-img").src = e.target.result;
+          document.getElementById("sa-preview-box").classList.remove("hidden");
+        };
+        reader.readAsDataURL(file);
+      },
+
+      selectAdvancePreset(presetKey) {
+        const jobs = window.store.getJobs();
+        const activeJob = jobs.find(j => j.driverId === this.activeDriverId && !window.store.isJobCompleted(j)) || jobs[0];
+        const v = window.store.getVehicle(activeJob?.vehicleId) || { plate: "ชบ.74-0549" };
+        const curTime = new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+
+        const liveCoords = (v && typeof v.lat === "number" && typeof v.lng === "number")
+          ? `${v.lat.toFixed(4)}° N, ${v.lng.toFixed(4)}° E`
+          : "13.2083° N, 101.0000° E";
+
+        let cfg = null;
+        let noteText = "";
+
+        if (presetKey === "fuel") {
+          noteText = "มิเตอร์จ่ายน้ำมัน B7 จำนวน 32,000 ลิตร";
+          cfg = { category: "fuel", title: "มิเตอร์ตู้จ่ายน้ำมันดีเซล B7", detail: "DIESEL B7 - 32,000 L", plate: v.plate, coords: liveCoords, time: `${curTime} น.`, badge: "⛽ REFUEL METER" };
+        } else if (presetKey === "customs") {
+          noteText = "ผ่านจุดตรวจปล่อยด่านศุลกากร พร้อมใบขน กศก.120";
+          cfg = { category: "customs", title: "จุดตรวจปล่อยด่านศุลกากร (ขาออก)", detail: "กศก.120 / CB-PERMIT", plate: v.plate, coords: liveCoords, time: `${curTime} น.`, badge: "🛂 CUSTOMS GATE" };
+        } else if (presetKey === "seal") {
+          noteText = "ตรวจสอบซีลล็อกนิรภัยถังบรรทุก สภาพสมบูรณ์";
+          cfg = { category: "seal", title: "ตรวจสภาพซีลล็อกนิรภัย (Tamper Seal)", detail: "SEAL NO. TH-CUSTOMS-8821", plate: v.plate, coords: liveCoords, time: `${curTime} น.`, badge: "🔒 TAMPER SEAL" };
+        } else if (presetKey === "pod") {
+          noteText = "ใบเสร็จรับสินค้า POD พร้อมลายเซ็นและประทับตราผู้รับ";
+          cfg = { category: "delivery", title: "ใบรับสินค้าสำเร็จ (POD) มีลายเซ็น", detail: "POD SIGNED CONFIRMED", plate: v.plate, coords: liveCoords, time: `${curTime} น.`, badge: "📝 PROOF OF DELIVERY" };
+        }
+
+        if (cfg && window.buildEvidenceSvg) {
+          const dataUri = window.buildEvidenceSvg(cfg);
+          this.pendingAdvancePhotoUrl = dataUri;
+          document.getElementById("sa-note-input").value = noteText;
+          document.getElementById("sa-preview-img").src = dataUri;
+          document.getElementById("sa-preview-box").classList.remove("hidden");
+        }
+      },
+
+      confirmSmartAdvance() {
+        const jobs = window.store.getJobs();
+        const activeJob = jobs.find(j => j.driverId === this.activeDriverId && !window.store.isJobCompleted(j)) || jobs[0];
+        const driver = window.store.getDriver(this.activeDriverId);
+        if (!activeJob) return;
+
+        const nextId = activeJob.currentStatusId + 1;
+        const nextStatus = window.store.getStatusMeta(nextId, activeJob);
+        const note = document.getElementById("sa-note-input").value || `คนขับอัปเดตเป็น ${nextStatus.name}`;
+
+        // Construct photo if attached
+        const photos = [];
+        if (this.pendingAdvancePhotoUrl) {
+          const curTime = new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+          photos.push({
+            id: "P-" + Date.now().toString(36),
+            category: nextStatus.key === "border_customs" ? "customs" : nextId >= 6 ? "delivery" : "fuel",
+            title: `ภาพถ่ายหลักฐานขั้นตอน: ${nextStatus.name}`,
+            caption: note,
+            url: this.pendingAdvancePhotoUrl,
+            timestamp: `${curTime}`,
+            coords: activeJob.lastGpsCoords || "13.7563° N, 100.5018° E",
+            author: `${driver ? driver.name : "คนขับรถ"} (Driver Mobile App)`
+          });
+        }
+
+        window.store.updateJobStatus(activeJob.id, nextId, note, `${driver ? driver.name : "คนขับรถ"} (Driver Mobile App)`, photos);
+        this.closeSmartAdvanceModal();
+        this.showToast(`อัปเดตขั้นตอน "${nextStatus.name}" พร้อมรูปหลักฐานสำเร็จ`, "success");
+        this.renderDriverData();
+      },
+
+      /* ==============================================================
+         Feature 4: Emergency SOS Incident Reporting
+      ============================================================== */
+      openSosModal() {
+        const jobs = window.store.getJobs();
+        const activeJob = jobs.find(j => j.driverId === this.activeDriverId && !window.store.isJobCompleted(j)) || jobs[0];
+        const v = window.store.getVehicle(activeJob?.vehicleId) || { plate: "ชบ.74-0549" };
+
+        document.getElementById("sos-plate-text").textContent = v.plate;
+        document.getElementById("modal-driver-sos").classList.remove("hidden");
+      },
+
+      closeSosModal() {
+        document.getElementById("modal-driver-sos").classList.add("hidden");
+      },
+
+      setSosType(typeKey) {
+        document.getElementById("sos-selected-type").value = typeKey;
+        const buttons = document.querySelectorAll("#sos-type-buttons .sos-btn");
+        buttons.forEach(btn => {
+          if (btn.getAttribute("data-type") === typeKey) {
+            btn.className = "sos-btn p-2 rounded-xl border text-xs font-bold text-left border-rose-500 bg-rose-50 text-rose-800 flex items-center gap-2";
+          } else {
+            btn.className = "sos-btn p-2 rounded-xl border text-xs font-bold text-left border-slate-200 bg-white text-slate-700 hover:bg-slate-50 flex items-center gap-2";
+          }
+        });
+      },
+
+      submitEmergencySos() {
+        const type = document.getElementById("sos-selected-type").value;
+        const detail = document.getElementById("sos-detail-input").value || "แจ้งเหตุฉุกเฉินบนเส้นทาง";
+        const curTime = new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+
+        const typeLabels = {
+          breakdown: "⚠️ รถเสีย/เครื่องยนต์ขัดข้อง/ยางแตก",
+          accident: "💥 อุบัติเหตุเฉี่ยวชนบนทางหลวง",
+          leak: "🛢️ วาล์วหรือถังบรรทุกมีปัญหา (สารเคมี/ก๊าซ)",
+          traffic: "🛑 การจราจรติดขัดรุนแรง / ทางปิด"
+        };
+
+        const incidentObj = {
+          id: "SOS-" + Date.now().toString(36),
+          driverId: this.activeDriverId,
+          type: type,
+          typeLabel: typeLabels[type] || "เหตุฉุกเฉิน",
+          detail: detail,
+          time: curTime,
+          timestamp: new Date().toISOString()
+        };
+
+        localStorage.setItem("NEXTROUTE_ACTIVE_SOS", JSON.stringify(incidentObj));
+        this.closeSosModal();
+        this.checkExistingSosAlert();
+        this.showToast("🚨 ส่งสัญญาณฉุกเฉินเข้าศูนย์ควบคุมเรียบร้อยแล้ว", "error");
+      },
+
+      checkExistingSosAlert() {
+        const raw = localStorage.getItem("NEXTROUTE_ACTIVE_SOS");
+        const banner = document.getElementById("driver-sos-active-banner");
+        const desc = document.getElementById("driver-sos-status-desc");
+        if (raw && banner) {
+          const sos = JSON.parse(raw);
+          if (desc) desc.textContent = `${sos.typeLabel}: "${sos.detail}" (${sos.time} น.)`;
+          banner.classList.remove("hidden");
+        } else if (banner) {
+          banner.classList.add("hidden");
+        }
+      },
+
+      clearEmergencyAlert() {
+        localStorage.removeItem("NEXTROUTE_ACTIVE_SOS");
+        this.checkExistingSosAlert();
+        this.showToast("ยกเลิกสัญญาณฉุกเฉินเรียบร้อย ปลอดภัยแล้ว", "success");
+      },
+
+      /* ==============================================================
+         Feature 2: Leaflet Interactive Map View
+      ============================================================== */
+      initOrUpdateLeafletMap() {
+        const jobs = window.store.getJobs();
+        const activeJob = jobs.find(j => j.driverId === this.activeDriverId && !window.store.isJobCompleted(j)) || jobs[0];
+        if (!activeJob) return;
+
+        const pLoc = window.store.getLocation(activeJob.pickupLocId) || { lat: 12.7185, lng: 101.1685, name: "จุดรับสินค้า" };
+        const dLoc = window.store.getLocation(activeJob.dropoffLocId) || { lat: 13.1182, lng: 100.9174, name: "จุดส่งสินค้า" };
+        const v = window.store.getVehicle(activeJob.vehicleId) || { lat: 13.1412, lng: 101.1684, plate: "ชบ.74-0549" };
+
+        if (!this.leafMap) {
+          this.leafMap = L.map('driver-live-map', { zoomControl: false, attributionControl: false }).setView([v.lat, v.lng], 10);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(this.leafMap);
+        }
+
+        // Clear existing markers
+        this.mapMarkers.forEach(m => this.leafMap.removeLayer(m));
+        this.mapMarkers = [];
+
+        const mP = L.marker([pLoc.lat, pLoc.lng]).addTo(this.leafMap).bindPopup(`<b>จุดรับ:</b> ${pLoc.name}`);
+        const mD = L.marker([dLoc.lat, dLoc.lng]).addTo(this.leafMap).bindPopup(`<b>จุดส่ง:</b> ${dLoc.name}`);
+        const mV = L.circleMarker([v.lat, v.lng], { radius: 10, color: '#2563eb', fillColor: '#3b82f6', fillOpacity: 0.95 }).addTo(this.leafMap).bindPopup(`<b>รถของคุณ:</b> ${v.plate}`);
+
+        // Route polyline
+        const line = L.polyline([[pLoc.lat, pLoc.lng], [v.lat, v.lng], [dLoc.lat, dLoc.lng]], { color: '#2563eb', weight: 4, dashArray: '6, 8' }).addTo(this.leafMap);
+
+        this.mapMarkers = [mP, mD, mV, line];
+        const group = new L.featureGroup([mP, mD, mV]);
+        this.leafMap.fitBounds(group.getBounds(), { padding: [35, 35] });
+
+        document.getElementById("driver-map-subtitle").textContent = `${pLoc.name} -> ${dLoc.name} (~${activeJob.routeDistanceKm || 120} กม.)`;
+      },
+
+      recenterMap() {
+        if (this.leafMap && this.mapMarkers.length > 0) {
+          const group = new L.featureGroup(this.mapMarkers);
+          this.leafMap.fitBounds(group.getBounds(), { padding: [35, 35] });
+        }
+      },
+
+      /* ==============================================================
+         History & Completed Jobs
+      ============================================================== */
+      renderHistoryData() {
+        const completedJobs = window.store.getJobs().filter(j => j.driverId === this.activeDriverId && window.store.isJobCompleted(j));
+        const list = document.getElementById("driver-history-list");
+        if (!list) return;
+
+        if (completedJobs.length === 0) {
+          list.innerHTML = `
+            <div class="p-4 bg-white rounded-2xl border border-slate-200 text-center text-xs text-slate-400">
+              ยังไม่มีรอบงานที่บันทึกเสร็จสิ้นในบัญชีนี้
+            </div>
+          `;
+          return;
+        }
+
+        list.innerHTML = completedJobs.map(j => {
+          const pLoc = window.store.getLocation(j.pickupLocId);
+          const dLoc = window.store.getLocation(j.dropoffLocId);
+          return `
+            <div class="p-3 bg-white rounded-2xl border border-slate-200 shadow-sm text-xs space-y-1">
+              <div class="flex items-center justify-between">
+                <span class="font-mono font-bold text-slate-900">${j.code}</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">เสร็จสมบูรณ์</span>
+              </div>
+              <div class="text-slate-600">${pLoc?.province || "-"} &rarr; ${dLoc?.province || "-"} (${j.routeDistanceKm || "-"} กม.)</div>
+              <div class="text-[10px] text-slate-400 flex justify-between pt-1 border-t border-slate-100">
+                <span>สินค้า: ${j.productType}</span>
+                <span>ส่งเมื่อ: ${j.departureDate}</span>
+              </div>
+            </div>
+          `;
+        }).join("");
+      },
+
+      /* ==============================================================
+         Photo Gallery & Lightbox
+      ============================================================== */
+      renderEvidencePhotos(activeJob) {
+        const gallery = document.getElementById("driver-photos-gallery");
+        const countBadge = document.getElementById("driver-photos-count");
+        if (!gallery) return;
+
+        const allPhotos = [];
+        (activeJob.timeline || []).forEach(t => {
+          (t.photos || []).forEach(p => {
+            allPhotos.push({ ...p, stepName: t.name, stepId: t.statusId });
+          });
+        });
+
+        if (countBadge) countBadge.textContent = allPhotos.length;
+
+        if (allPhotos.length === 0) {
+          gallery.innerHTML = `
+            <div class="col-span-2 text-center py-4 border-2 border-dashed border-slate-200 rounded-xl">
+              <span class="text-xl">📷</span>
+              <div class="text-xs font-bold text-slate-600 mt-1">ยังไม่มีภาพถ่ายหลักฐาน</div>
+              <p class="text-[10px] text-slate-400 mt-0.5">กดปุ่ม "ถ่ายรูปรายงาน" เพื่อบันทึกภาพถ่าย</p>
+            </div>
+          `;
+          return;
+        }
+
+        const catBadges = {
+          fuel: { label: "⛽ เติมน้ำมัน", bg: "bg-blue-100 text-blue-800" },
+          customs: { label: "🛂 ด่านศุลกากร", bg: "bg-purple-100 text-purple-800" },
+          seal: { label: "🔒 ซีลนิรภัย", bg: "bg-amber-100 text-amber-800" },
+          inspection: { label: "🔍 ตรวจสภาพรถ", bg: "bg-emerald-100 text-emerald-800" },
+          delivery: { label: "📝 ส่งมอบ/POD", bg: "bg-indigo-100 text-indigo-800" },
+          other: { label: "📷 รูปหลักฐาน", bg: "bg-slate-100 text-slate-800" }
+        };
+
+        gallery.innerHTML = allPhotos.map((p, idx) => {
+          const cat = catBadges[p.category] || catBadges.other;
+          return `
+            <div onclick="DriverApp.openPhotoViewer(${idx})" class="group relative rounded-xl overflow-hidden border border-slate-200 bg-slate-900 cursor-pointer shadow-sm">
+              <img src="${p.url}" alt="${p.title || 'หลักฐาน'}" class="w-full h-24 object-cover">
+              <div class="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-transparent to-transparent flex flex-col justify-between p-1.5">
+                <span class="self-start px-1.5 py-0.5 rounded text-[8px] font-bold ${cat.bg} shadow-sm backdrop-blur">
+                  ${cat.label}
+                </span>
+                <div class="text-[10px] text-white truncate font-medium">
+                  ${p.title || p.caption || "ดูรูปภาพ"}
+                </div>
+              </div>
+            </div>
+          `;
+        }).join("");
+        this._cachedPhotos = allPhotos;
+      },
+
+      openPhotoViewer(photoIdx) {
+        const photo = this._cachedPhotos?.[photoIdx];
+        if (!photo) return;
+
+        const modal = document.getElementById("modal-driver-lightbox");
+        if (!modal) return;
+
+        document.getElementById("dl-img").src = photo.url;
+        document.getElementById("dl-title").textContent = photo.title || photo.stepName;
+        document.getElementById("dl-step").textContent = `ขั้นตอน: ${photo.stepName || "-"}`;
+        document.getElementById("dl-time").textContent = `${photo.timestamp} น.`;
+        document.getElementById("dl-coords").textContent = photo.coords || "GPS Logged";
+        document.getElementById("dl-caption").textContent = photo.caption || "-";
+
+        modal.classList.remove("hidden");
+      },
+
+      closePhotoViewer() {
+        const modal = document.getElementById("modal-driver-lightbox");
+        if (modal) modal.classList.add("hidden");
+      },
+
+      openUploadModal() {
+        const jobs = window.store.getJobs();
+        const activeJob = jobs.find(j => j.driverId === this.activeDriverId && !window.store.isJobCompleted(j)) || jobs[0];
+        if (!activeJob) return;
+
+        const flow = window.store.getStatusFlow(activeJob);
+        const selStep = document.getElementById("du-step");
+        if (selStep) {
+          selStep.innerHTML = flow.map(s => `
+            <option value="${s.id}" ${s.id === activeJob.currentStatusId ? "selected" : ""}>
+              ${s.id}. ${s.name} ${s.id === activeJob.currentStatusId ? "(ขั้นตอนปัจจุบัน)" : ""}
+            </option>
+          `).join("");
+        }
+
+        this.pendingPhotoUrl = null;
+        document.getElementById("du-preview-box").classList.add("hidden");
+        document.getElementById("du-file-input").value = "";
+        this.selectMockPreset("fuel");
+
+        document.getElementById("modal-driver-upload").classList.remove("hidden");
+      },
+
+      closeUploadModal() {
+        document.getElementById("modal-driver-upload").classList.add("hidden");
+      },
+
+      setCategory(catKey) {
+        document.getElementById("du-category").value = catKey;
+        const btns = document.querySelectorAll("#du-cat-buttons .cat-pill");
+        btns.forEach(b => {
+          if (b.getAttribute("data-cat") === catKey) {
+            b.className = "cat-pill px-2.5 py-1 rounded-lg text-xs font-bold border border-blue-500 bg-blue-50 text-blue-700";
+          } else {
+            b.className = "cat-pill px-2.5 py-1 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700";
+          }
+        });
+      },
+
+      handleFileSelected(event) {
+        const file = event.target?.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          this.pendingPhotoUrl = e.target.result;
+          const box = document.getElementById("du-preview-box");
+          const img = document.getElementById("du-preview-img");
+          if (box && img) {
+            img.src = e.target.result;
+            box.classList.remove("hidden");
+          }
+        };
+        reader.readAsDataURL(file);
+      },
+
+      selectMockPreset(presetKey) {
+        const jobs = window.store.getJobs();
+        const activeJob = jobs.find(j => j.driverId === this.activeDriverId && !window.store.isJobCompleted(j)) || jobs[0];
+        const v = window.store.getVehicle(activeJob?.vehicleId) || { plate: "ชบ.74-0549" };
+        const curTime = new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+
+        let cfg = null;
+        let cat = "other";
+        let caption = "";
+
+        const liveCoords = (v && typeof v.lat === "number" && typeof v.lng === "number")
+          ? `${v.lat.toFixed(4)}° N, ${v.lng.toFixed(4)}° E`
+          : "13.2083° N, 101.0000° E";
+
+        if (presetKey === "fuel") {
+          cat = "fuel";
+          caption = "ภาพถ่ายใบเสร็จและมิเตอร์ตู้จ่ายน้ำมัน B7 จำนวน 32,000 ลิตร";
+          cfg = { category: "fuel", title: "มิเตอร์ตู้จ่ายน้ำมันดีเซล B7", detail: "DIESEL B7 - 32,000 L", plate: v.plate, coords: liveCoords, time: `${curTime} น.`, badge: "⛽ REFUEL METER" };
+        } else if (presetKey === "customs") {
+          cat = "customs";
+          caption = "ภาพถ่ายตรวจปล่อยด่านศุลกากร พร้อมใบขน กศก.120";
+          cfg = { category: "customs", title: "จุดตรวจปล่อยด่านศุลกากร (ขาออก)", detail: "กศก.120 / CB-PERMIT", plate: v.plate, coords: liveCoords, time: `${curTime} น.`, badge: "🛂 CUSTOMS GATE" };
+        } else if (presetKey === "seal") {
+          cat = "seal";
+          caption = "ภาพถ่ายตรวจสอบซีลล็อกนิรภัยถังบรรทุก สภาพสมบูรณ์";
+          cfg = { category: "seal", title: "ตรวจสภาพซีลล็อกนิรภัย (Tamper Seal)", detail: "SEAL NO. TH-CUSTOMS-8821", plate: v.plate, coords: liveCoords, time: `${curTime} น.`, badge: "🔒 TAMPER SEAL" };
+        } else if (presetKey === "pod") {
+          cat = "delivery";
+          caption = "ภาพถ่ายใบเสร็จรับสินค้า POD พร้อมลายเซ็นและประทับตรา";
+          cfg = { category: "delivery", title: "ใบรับสินค้าสำเร็จ (POD) มีลายเซ็น", detail: "POD SIGNED CONFIRMED", plate: v.plate, coords: liveCoords, time: `${curTime} น.`, badge: "📝 PROOF OF DELIVERY" };
+        }
+
+        if (cfg && window.buildEvidenceSvg) {
+          const dataUri = window.buildEvidenceSvg(cfg);
+          this.pendingPhotoUrl = dataUri;
+          this.setCategory(cat);
+          document.getElementById("du-caption").value = caption;
+          const box = document.getElementById("du-preview-box");
+          const img = document.getElementById("du-preview-img");
+          if (box && img) {
+            img.src = dataUri;
+            box.classList.remove("hidden");
+          }
+        }
+      },
+
+      submitUpload(event) {
+        if (event) event.preventDefault();
+
+        const jobs = window.store.getJobs();
+        const activeJob = jobs.find(j => j.driverId === this.activeDriverId && !window.store.isJobCompleted(j)) || jobs[0];
+        const driver = window.store.getDriver(this.activeDriverId);
+        if (!activeJob) return;
+
+        if (!this.pendingPhotoUrl) {
+          this.selectMockPreset("fuel");
+        }
+
+        const selStep = document.getElementById("du-step");
+        const statusId = selStep ? parseInt(selStep.value) : activeJob.currentStatusId;
+        const category = document.getElementById("du-category").value || "fuel";
+        const caption = document.getElementById("du-caption").value || "บันทึกภาพถ่ายหลักฐาน";
+
+        const curTime = new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+        const photoObj = {
+          id: "P-" + Date.now().toString(36),
+          category: category,
+          title: `ภาพถ่ายหลักฐาน: ${category}`,
+          caption: caption,
+          url: this.pendingPhotoUrl,
+          timestamp: `${curTime}`,
+          coords: activeJob.lastGpsCoords || "13.7563° N, 100.5018° E",
+          author: `${driver ? driver.name : "คนขับรถ"} (Driver Mobile App)`
+        };
+
+        window.store.addJobTimelinePhoto(activeJob.id, statusId, photoObj);
+        this.closeUploadModal();
+        this.showToast(`บันทึกภาพถ่ายหลักฐานเรียบร้อยแล้ว`, "success");
+        this.renderDriverData();
+      },
+
+      copyTrackingLink() {
+        const jobs = window.store.getJobs();
+        const activeJob = jobs.find(j => j.driverId === this.activeDriverId && !window.store.isJobCompleted(j)) || jobs[0];
+        if (!activeJob) return;
+        const origin = window.location.origin || "http://localhost:8080";
+        const link = `${origin}/track.html?job=${encodeURIComponent(activeJob.code)}`;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(link).then(() => {
+            this.showToast(`คัดลอกลิงก์ให้ลูกค้าแล้ว: ${activeJob.code}`, "success");
+          }).catch(() => {
+            prompt("คัดลอกลิงก์นี้ส่งให้ลูกค้า:", link);
+          });
+        } else {
+          prompt("คัดลอกลิงก์นี้ส่งให้ลูกค้า:", link);
+        }
+      },
+
+      showToast(message, type = "info") {
+        const container = document.getElementById("toast-container") || document.body;
+        const toast = document.createElement("div");
+        toast.className = `fixed bottom-20 left-4 right-4 z-50 px-4 py-3 rounded-xl shadow-2xl text-white text-xs font-semibold flex items-center gap-2 transform transition-all duration-300 translate-y-2 opacity-0 ${
+          type === "success" ? "bg-emerald-600" : type === "error" ? "bg-rose-600" : "bg-slate-800"
+        }`;
+        toast.innerHTML = `
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span>${message}</span>
+        `;
+        container.appendChild(toast);
+
+        setTimeout(() => {
+          toast.classList.remove("translate-y-2", "opacity-0");
+        }, 10);
+
+        setTimeout(() => {
+          toast.classList.add("translate-y-2", "opacity-0");
+          setTimeout(() => toast.remove(), 300);
+        }, 3500);
       }
     };
 

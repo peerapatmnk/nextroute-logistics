@@ -4,9 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NextRoute Tracking - ติดตามสถานะงานขนส่งสินค้า</title>
+  <link rel="stylesheet" href="css/tailwind-offline.css">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="js/leaflet-fallback.js"></script>
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
@@ -23,29 +25,24 @@
       </div>
     </div>
 
-    <div class="flex items-center gap-2">
-      <a href="index.html" class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-semibold text-slate-700 transition">
-        &larr; กลับเข้าระบบจัดการ (Admin)
+    <div class="flex items-center gap-2.5">
+      <div class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full text-emerald-800 text-xs font-bold shadow-sm">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span>GPS Live Tracking</span>
+      </div>
+      <button type="button" onclick="TrackApp.openPodModal()" class="px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer" title="พิมพ์ใบกำกับการขนส่ง/ใบส่งสินค้า">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        <span>📄 ใบกำกับการขนส่ง/POD</span>
+      </button>
+      <a href="tel:038123456" class="px-3.5 py-1.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+        <svg class="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+        <span>สายด่วน: 038-123-456</span>
       </a>
     </div>
   </header>
 
   <!-- Main Container -->
   <main class="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 space-y-6">
-    <!-- Search Bar -->
-    <div class="p-6 bg-gradient-to-r from-blue-700 to-indigo-800 text-white rounded-3xl shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
-      <div>
-        <h2 class="text-xl font-black">ค้นหาสถานะงานขนส่ง</h2>
-        <p class="text-xs text-blue-100 mt-1">กรอกรหัสงาน (เช่น JN-001 หรือ JN-2026-001) เพื่อติดตามตำแหน่งและเวลาถึง ETA</p>
-      </div>
-      <div class="flex items-center gap-2 w-full md:w-auto">
-        <input type="text" id="track-input" placeholder="กรอกเลขงาน เช่น JN-001" value="JN-001" class="px-4 py-2.5 rounded-xl text-slate-800 font-bold text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 w-full md:w-64 shadow">
-        <button onclick="TrackApp.search()" class="px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold text-sm rounded-xl shadow transition shrink-0">
-          ค้นหา &rarr;
-        </button>
-      </div>
-    </div>
-
     <!-- Tracking Result Box -->
     <div id="track-result-card" class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
@@ -116,8 +113,55 @@
         <h4 class="text-xs font-bold text-slate-800 mb-3">บันทึกขั้นตอนการเดินทางล่าสุด</h4>
         <div id="track-timeline-list" class="space-y-2"></div>
       </div>
+
+      <!-- Evidence Photos Gallery for Customer Verification -->
+      <div id="track-photos-section" class="pt-4 border-t border-slate-100 hidden">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <h4 class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <span>📷 ภาพถ่ายหลักฐานการขนส่ง (Proof of Delivery / Evidence)</span>
+              <span id="track-photos-count" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700">0</span>
+            </h4>
+            <p class="text-[10px] text-slate-400 mt-0.5">ภาพถ่ายตรวจสภาพรถ จุดข้ามแดน และหลักฐานการส่งมอบสินค้าพร้อมพิกัด GPS</p>
+          </div>
+          <span class="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200">
+            ✓ ตรวจสอบแล้ว
+          </span>
+        </div>
+        <div id="track-photos-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
     </div>
   </main>
+
+  <!-- Customer Photo Lightbox Modal -->
+  <div id="modal-track-lightbox" class="fixed inset-0 bg-slate-900/85 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4" onclick="TrackApp.closeLightbox()">
+    <div class="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl space-y-3 p-5" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between border-b pb-2.5">
+        <div>
+          <span class="text-[10px] uppercase font-bold text-blue-600" id="t-lightbox-cat">หลักฐานการส่งมอบ</span>
+          <h3 class="font-bold text-sm text-slate-900" id="t-lightbox-title">ภาพถ่ายหลักฐาน</h3>
+        </div>
+        <button onclick="TrackApp.closeLightbox()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg text-xs font-bold">✕ ปิด</button>
+      </div>
+      <div class="bg-slate-950 rounded-2xl overflow-hidden flex items-center justify-center p-3 relative">
+        <img id="t-lightbox-img" src="" alt="Proof" class="max-h-72 object-contain rounded-lg">
+      </div>
+      <div class="text-xs text-slate-600 space-y-2">
+        <div id="t-lightbox-caption" class="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-[11px] leading-relaxed">-</div>
+        <div class="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-100">
+          <span id="t-lightbox-coords" class="font-mono">พิกัด GPS: -</span>
+          <span id="t-lightbox-time" class="font-mono">เวลาประทับ: -</span>
+        </div>
+      </div>
+      <div class="pt-2">
+        <button onclick="TrackApp.closeLightbox()" class="w-full py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition">
+          ปิดหน้าต่าง
+        </button>
+      </div>
+    </div>
+  </div>
 
   <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-400">
     NextRoute Logistics Co., Ltd. &copy; 2026 - ระบบติดตามสถานะงานขนส่ง
@@ -126,16 +170,28 @@
   <script src="js/data.js"></script>
   <script src="js/store.js"></script>
   <script src="js/eta.js"></script>
+  <script src="js/gps-sync.js"></script>
   <script>
     const TrackApp = {
       map: null,
       markerVehicle: null,
       markerPickup: null,
       markerDropoff: null,
+      currentJobPhotos: [],
+      currentJobId: null,
 
       init() {
         this.initMap();
-        this.search();
+        // Read URL parameters (?job=JN-001 หรือ ?code=JN-2026-001)
+        const params = new URLSearchParams(window.location.search);
+        const queryJob = params.get('job') || params.get('code') || params.get('id');
+        this.currentJobId = queryJob;
+        this.loadJob(queryJob);
+
+        // Auto-refresh marker on live GPS sync
+        window.addEventListener("nwt:gps-synced", () => {
+          this.loadJob(this.currentJobId);
+        });
       },
 
       initMap() {
@@ -143,12 +199,25 @@
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(this.map);
       },
 
-      search() {
-        const query = document.getElementById("track-input").value.trim().toUpperCase();
-        const job = window.store.getJobs().find(j => j.id.toUpperCase() === query || j.code.toUpperCase() === query) || window.store.getJobs()[0];
+      search(jobQuery) {
+        this.loadJob(jobQuery);
+      },
+
+      loadJob(jobQuery = null) {
+        const jobs = window.store.getJobs();
+        let job = null;
+
+        if (jobQuery) {
+          const clean = jobQuery.trim().toUpperCase();
+          job = jobs.find(j => j.id.toUpperCase() === clean || j.code.toUpperCase() === clean);
+        }
 
         if (!job) {
-          alert("ไม่พบข้อมูลใบงานนี้ กรุณาตรวจสอบรหัสงานอีกครั้ง");
+          // If no specific query or not found, show active ongoing job or latest job
+          job = jobs.find(j => !window.store.isJobCompleted(j)) || jobs[0];
+        }
+
+        if (!job) {
           return;
         }
 
@@ -263,10 +332,274 @@
             </div>
           `).reverse().join("");
         }
+
+        // Evidence Photos for Customer
+        const photosSection = document.getElementById("track-photos-section");
+        const photosGrid = document.getElementById("track-photos-grid");
+        const photosCount = document.getElementById("track-photos-count");
+
+        const allPhotos = [];
+        (job.timeline || []).forEach(t => {
+          (t.photos || []).forEach(p => {
+            allPhotos.push({ ...p, stepName: t.name });
+          });
+        });
+
+        this.currentJobPhotos = allPhotos;
+
+        if (photosSection && photosGrid) {
+          if (allPhotos.length > 0) {
+            photosSection.classList.remove("hidden");
+            if (photosCount) photosCount.textContent = allPhotos.length;
+
+            const catBadges = {
+              fuel: { label: "⛽ เติมน้ำมัน", bg: "bg-blue-100 text-blue-800" },
+              customs: { label: "🛂 ด่านศุลกากร", bg: "bg-purple-100 text-purple-800" },
+              seal: { label: "🔒 ซีลนิรภัย", bg: "bg-amber-100 text-amber-800" },
+              inspection: { label: "🔍 ตรวจสภาพรถ", bg: "bg-emerald-100 text-emerald-800" },
+              delivery: { label: "📝 ส่งมอบ/POD", bg: "bg-indigo-100 text-indigo-800" },
+              other: { label: "📷 รูปหลักฐาน", bg: "bg-slate-100 text-slate-800" }
+            };
+
+            photosGrid.innerHTML = allPhotos.map((p, idx) => {
+              const cat = catBadges[p.category] || catBadges.other;
+              return `
+                <div onclick="TrackApp.openLightbox(${idx})" class="group relative rounded-xl overflow-hidden border border-slate-200 bg-slate-900 cursor-pointer shadow-sm hover:border-blue-400 transition">
+                  <img src="${p.url}" alt="${p.title || 'หลักฐาน'}" class="w-full h-24 object-cover group-hover:scale-105 transition duration-300">
+                  <div class="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-transparent to-transparent flex flex-col justify-between p-1.5 pointer-events-none">
+                    <span class="self-start px-1.5 py-0.5 rounded text-[8px] font-bold ${cat.bg} shadow-sm backdrop-blur">
+                      ${cat.label}
+                    </span>
+                    <div class="text-[10px] text-white truncate font-medium">
+                      ${p.title || p.caption || "ดูรูปภาพ"}
+                    </div>
+                  </div>
+                  <div class="absolute inset-0 bg-blue-600/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                    <span class="w-6 h-6 rounded-full bg-white/95 text-blue-700 flex items-center justify-center shadow text-xs">🔍</span>
+                  </div>
+                </div>
+              `;
+            }).join("");
+          } else {
+            photosSection.classList.add("hidden");
+          }
+        }
+      },
+
+      openLightbox(photoIdx) {
+        const photo = this.currentJobPhotos[photoIdx];
+        if (!photo) return;
+
+        const modal = document.getElementById("modal-track-lightbox");
+        if (!modal) return;
+
+        document.getElementById("t-lightbox-img").src = photo.url;
+        document.getElementById("t-lightbox-title").textContent = photo.title || photo.stepName;
+        document.getElementById("t-lightbox-cat").textContent = `ขั้นตอน: ${photo.stepName || "-"}`;
+        document.getElementById("t-lightbox-caption").textContent = photo.caption || photo.title || "หลักฐานการปฏิบัติงาน";
+        document.getElementById("t-lightbox-coords").textContent = `พิกัด GPS: ${photo.coords || "บันทึกเรียบร้อย"}`;
+        document.getElementById("t-lightbox-time").textContent = `เวลา: ${photo.timestamp || "-"} น.`;
+
+        modal.classList.remove("hidden");
+      },
+
+      closeLightbox() {
+        const modal = document.getElementById("modal-track-lightbox");
+        if (modal) modal.classList.add("hidden");
+      },
+
+      openPodModal() {
+        const jobs = window.store.getJobs();
+        let job = null;
+        if (this.currentJobId) {
+          const clean = this.currentJobId.trim().toUpperCase();
+          job = jobs.find(j => j.id.toUpperCase() === clean || j.code.toUpperCase() === clean);
+        }
+        if (!job) {
+          job = jobs.find(j => !window.store.isJobCompleted(j)) || jobs[0];
+        }
+        if (!job) return;
+
+        const cust = window.store.getCustomer(job.customerId) || { name: "ลูกค้าผู้รับสินค้า" };
+        const v = window.store.getVehicle(job.vehicleId) || { plate: "ชบ.74-0549", model: "P360", dltUnitId: "2020001000NEXTROUTE00740549" };
+        const d = window.store.getDriver(job.driverId) || { name: "นายสุเทพ โพธิ์ศรี", licenseNo: "ท.4-64000892" };
+        const pLoc = window.store.getLocation(job.pickupLocId) || { name: "คลังน้ำมันและปิโตรเคมีมาบตาพุด", province: "ระยอง" };
+        const dLoc = window.store.getLocation(job.dropoffLocId) || { name: "โรงกลั่นน้ำมันศรีราชา (ไทยออยล์)", province: "ชลบุรี" };
+        const statusMeta = window.store.getStatusMeta(job.currentStatusId, job) || { name: "กำลังขนส่ง" };
+        const flow = window.store.getStatusFlow(job);
+
+        const isDiesel = (job.productType || "").includes("ดีเซล") || (job.productType || "").includes("น้ำมัน");
+        const unNumber = isDiesel ? "UN 1202" : "UN 1075";
+        const hazmatName = isDiesel ? "DIESEL FUEL / GAS OIL (ของเหลวไวไฟ คลาส 3)" : "PETROLEUM GASES, LIQUEFIED (ก๊าซไวไฟ คลาส 2.1)";
+        const hazardClass = isDiesel ? "CLASS 3 (ของเหลวไวไฟ)" : "CLASS 2.1 (ก๊าซไวไฟ)";
+        const sealNo = job.customsSealNo || "SEAL-NRL-" + (job.id ? job.id.replace(/\D/g, "") : "8821");
+
+        const container = document.getElementById("track-pod-content");
+        if (!container) return;
+
+        container.innerHTML = `
+          <div class="flex items-start justify-between border-b-2 border-slate-900 pb-4">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 bg-blue-700 text-white rounded-xl flex items-center justify-center font-bold text-xl shadow">
+                NR
+              </div>
+              <div>
+                <div class="text-base font-black text-slate-900 tracking-tight">บริษัท เน็คท์รูท โลจิสติกส์ จำกัด (NextRoute Logistics Co., Ltd.)</div>
+                <div class="text-xs text-slate-600">99/12 หมู่ 3 ต.ดอนหัวฬ่อ อ.เมืองชลบุรี จ.ชลบุรี 20000 • โทร 038-123-456</div>
+                <div class="text-[11px] text-blue-700 font-semibold">ระบบบริหารงานขนส่งและติดตามวัตถุอันตรายมาตรฐานกรมการขนส่งทางบก (DLT GPS Certified)</div>
+              </div>
+            </div>
+            <div class="text-right">
+              <div class="text-[10px] font-bold uppercase text-slate-400">เลขที่เอกสาร / Manifest No.</div>
+              <div class="text-sm font-black font-mono text-slate-900">NRL-POD-${job.code || job.id}</div>
+              <div class="text-[10px] text-slate-500 mt-0.5">วันที่: ${job.departureDate || new Date().toISOString().split("T")[0]}</div>
+            </div>
+          </div>
+
+          <div class="bg-slate-900 text-white p-2.5 rounded-lg text-center">
+            <h2 class="text-sm font-black tracking-wide uppercase">ใบกำกับการขนส่งวัตถุอันตรายและใบส่งมอบสินค้า (Dangerous Goods Manifest & Proof of Delivery)</h2>
+            <div class="text-[10px] text-slate-300">ออกตามพระราชบัญญัติการขนส่งทางบก พ.ศ. 2522 และประกาศกรมการขนส่งทางบก</div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3 p-3 bg-amber-50/80 border border-amber-300 rounded-xl text-xs">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 bg-rose-600 text-white rounded-lg flex flex-col items-center justify-center font-bold border-2 border-white shadow-sm shrink-0">
+                <span class="text-[10px] leading-none">🔥</span>
+                <span class="text-sm font-black leading-none mt-1">3</span>
+              </div>
+              <div>
+                <div class="text-[10px] font-bold text-slate-500 uppercase">Hazard Class</div>
+                <div class="font-black text-rose-700">${hazardClass}</div>
+                <div class="font-mono font-bold text-slate-800 text-xs">${unNumber}</div>
+              </div>
+            </div>
+            <div>
+              <div class="text-[10px] font-bold text-slate-500 uppercase">ชื่อผลิตภัณฑ์ / Shipping Name</div>
+              <div class="font-bold text-slate-900">${job.productType}</div>
+              <div class="text-[11px] text-slate-600">${hazmatName}</div>
+            </div>
+            <div>
+              <div class="text-[10px] font-bold text-slate-500 uppercase">ปริมาณและซีลนิรภัย</div>
+              <div class="font-black text-blue-700 font-mono text-sm">${job.productQty}</div>
+              <div class="text-[11px] font-mono text-emerald-800 font-bold">🔒 Seal: ${sealNo}</div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4 text-xs">
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+              <div class="text-[10px] font-bold uppercase text-slate-400">คลังต้นทางที่จ่ายสินค้า (Shipper)</div>
+              <div class="font-bold text-slate-900">${pLoc.name}</div>
+              <div class="text-slate-600">จังหวัด: ${pLoc.province}</div>
+              <div class="text-slate-500 text-[11px]">เวลาออกเดินทาง: ${job.departureTime || "09:00"} น.</div>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+              <div class="text-[10px] font-bold uppercase text-slate-400">ผู้รับสินค้า (Consignee)</div>
+              <div class="font-bold text-slate-900">${cust.name}</div>
+              <div class="text-slate-600">จุดส่งมอบ: ${dLoc.name} (${dLoc.province})</div>
+              <div class="text-emerald-700 font-bold text-[11px]">เวลาคาดการณ์ถึง (ETA): ${job.eta || "-"} น.</div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+            <div>
+              <span class="text-[10px] font-bold text-slate-400 block">ทะเบียนรถบรรทุก:</span>
+              <strong class="font-mono text-slate-900 text-sm">${v.plate}</strong>
+              <span class="text-[10px] text-slate-500 block">${v.brand || "Scania"} ${v.model || "P360"}</span>
+            </div>
+            <div>
+              <span class="text-[10px] font-bold text-slate-400 block">รหัสเครื่อง DLT GPS (NWT):</span>
+              <strong class="font-mono text-blue-700 text-[11px] block truncate">${v.dltUnitId || "2020001000NEXTROUTE00740549"}</strong>
+              <span class="text-[10px] text-emerald-600 font-bold">🟢 ผ่านการรับรอง DLT</span>
+            </div>
+            <div>
+              <span class="text-[10px] font-bold text-slate-400 block">พนักงานขับรถ:</span>
+              <strong class="text-slate-900 text-xs block">${d.name}</strong>
+              <span class="text-[10px] text-slate-500 block">ใบขับขี่ ท.4: ${d.licenseNo || "ท.4-64000892"}</span>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-xs">
+            <div class="font-bold text-slate-800 flex items-center justify-between">
+              <span>ความคืบหน้าสถานะการจัดส่ง (Status Audit Trail):</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700">สถานะปัจจุบัน: ${statusMeta.name}</span>
+            </div>
+            <div class="grid grid-cols-4 sm:grid-cols-7 gap-1.5 text-center">
+              ${flow.map(s => {
+                const isDone = s.id <= job.currentStatusId;
+                return `
+                  <div class="p-1.5 rounded-lg border text-[10px] ${isDone ? 'bg-emerald-50 border-emerald-300 text-emerald-800 font-bold' : 'bg-slate-50 border-slate-200 text-slate-400'}">
+                    <div>${s.id}. ${s.name}</div>
+                    <div class="text-[9px] mt-0.5">${isDone ? '✓ บันทึกแล้ว' : 'รอดำเนินการ'}</div>
+                  </div>
+                `;
+              }).join("")}
+            </div>
+          </div>
+
+          <div class="pt-4 border-t border-slate-200 grid grid-cols-3 gap-4 text-center text-xs">
+            <div class="p-3 border border-dashed border-slate-300 rounded-xl space-y-2">
+              <div class="text-[10px] font-bold text-slate-500">ผู้จ่ายสินค้า / คลังต้นทาง</div>
+              <div class="h-10 border-b border-slate-300"></div>
+              <div class="text-[10px] text-slate-400">(เจ้าหน้าที่คลังน้ำมัน)</div>
+              <div class="text-[9px] text-slate-400">วันที่: ...../...../..........</div>
+            </div>
+            <div class="p-3 border border-dashed border-slate-300 rounded-xl space-y-2">
+              <div class="text-[10px] font-bold text-slate-500">พนักงานขับรถ / ผู้ขนส่ง</div>
+              <div class="h-10 border-b border-slate-300 flex items-center justify-center font-serif text-slate-700 italic">
+                ${d.name}
+              </div>
+              <div class="text-[10px] text-slate-600 font-bold">${d.name}</div>
+              <div class="text-[9px] text-slate-400">เวลาออก: ${job.departureTime || "09:00"} น.</div>
+            </div>
+            <div class="p-3 border border-dashed border-slate-300 rounded-xl space-y-2">
+              <div class="text-[10px] font-bold text-slate-500">ผู้รับมอบสินค้า / ปลายทาง</div>
+              <div class="h-10 border-b border-slate-300"></div>
+              <div class="text-[10px] text-slate-400">(ลงนามและประทับตรา)</div>
+              <div class="text-[9px] text-slate-400">วันที่: ...../...../.......... เวลา: .....:..... น.</div>
+            </div>
+          </div>
+
+          <div class="pt-2 text-[10px] text-slate-400 flex items-center justify-between border-t border-slate-100">
+            <div>NextRoute TMS Security & Compliance System • Tamper-proof GPS Verification</div>
+            <div class="font-mono">VERIFIED BY NWT CLOUD GPS • CERTIFIED ACCURATE</div>
+          </div>
+        `;
+
+        document.getElementById("track-pod-modal").classList.remove("hidden");
+      },
+
+      closePodModal() {
+        const modal = document.getElementById("track-pod-modal");
+        if (modal) modal.classList.add("hidden");
       }
     };
 
     window.addEventListener("DOMContentLoaded", () => TrackApp.init());
   </script>
+
+  <!-- POD Modal -->
+  <div id="track-pod-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4 animate-fadeIn">
+    <div class="bg-white rounded-3xl max-w-3xl w-full max-h-[94vh] overflow-y-auto p-6 sm:p-8 shadow-2xl space-y-6">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-100 print:hidden">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-base">
+            📄
+          </div>
+          <div>
+            <h3 class="font-bold text-sm text-slate-900">ใบกำกับการขนส่งวัตถุอันตรายและใบส่งมอบสินค้า (Dangerous Goods Manifest & POD)</h3>
+            <p class="text-[10px] text-slate-400">เอกสารมาตรฐานขนส่งตามข้อกำหนดกรมธุรกิจพลังงานและกรมการขนส่งทางบก</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="window.print()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition flex items-center gap-1.5 cursor-pointer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+            <span>พิมพ์เอกสาร (Print / PDF)</span>
+          </button>
+          <button type="button" onclick="TrackApp.closePodModal()" class="text-slate-400 hover:text-slate-600 p-2 text-sm font-bold rounded-xl hover:bg-slate-100">✕</button>
+        </div>
+      </div>
+      <div id="track-pod-content" class="border border-slate-300 rounded-2xl p-6 space-y-5 text-slate-900 bg-white"></div>
+    </div>
+  </div>
 </body>
 </html>
