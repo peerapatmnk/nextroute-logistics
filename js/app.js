@@ -39,9 +39,17 @@ const App = {
     window.store.subscribe(() => {
       this.updateKPICards();
       this.refreshCurrentView();
+      if (window.SafetyAlerts && typeof window.SafetyAlerts.evaluate === "function") {
+        window.SafetyAlerts.evaluate();
+      }
     });
 
     this.updateKPICards();
+
+    // Initialize Fleet Safety & Smart Alerts Service
+    if (window.SafetyAlerts && typeof window.SafetyAlerts.init === "function") {
+      window.SafetyAlerts.init();
+    }
   },
 
   updateUserHeader() {

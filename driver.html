@@ -65,6 +65,20 @@
           </button>
         </div>
 
+        <!-- Dispatcher Safety Check-In Banner -->
+        <div id="driver-safety-check-banner" class="hidden p-3.5 bg-amber-500 text-white rounded-2xl shadow-lg flex items-center justify-between gap-3 animate-bounce">
+          <div class="flex items-center gap-2.5 text-xs">
+            <span class="text-xl">⚠️</span>
+            <div>
+              <div class="font-bold text-white">ศูนย์ควบคุมส่งสัญญาณตรวจสอบความปลอดภัย</div>
+              <div class="text-[11px] text-amber-100" id="driver-safety-check-desc">กรุณากดยืนยันว่าคุณและรถปลอดภัยดี</div>
+            </div>
+          </div>
+          <button type="button" onclick="DriverApp.confirmSafetyOk()" class="px-3 py-1.5 bg-white text-emerald-800 hover:bg-emerald-50 rounded-xl text-xs font-black shrink-0 transition shadow-sm">
+            ยืนยันว่าปลอดภัย 🟢
+          </button>
+        </div>
+
         <!-- Active Job Banner -->
         <div class="p-4 bg-gradient-to-br from-slate-900 to-blue-950 text-white rounded-2xl shadow-lg relative overflow-hidden">
           <div class="absolute -right-4 -bottom-4 w-28 h-28 bg-blue-500/10 rounded-full blur-xl"></div>
@@ -669,6 +683,10 @@
         }
 
         const driver = window.store.getDriver(this.activeDriverId) || { name: u?.name || "นายสุเทพ โพธิ์ศรี", vehiclePlate: u?.vehiclePlate || "ชบ.74-0549" };
+        this.driverProfile = driver;
+        const v = window.store.getVehicles().find(item => item.driverId === this.activeDriverId || item.plate === driver.vehiclePlate);
+        this.activeVehicleId = v ? v.id : "V-07";
+
         const elName = document.getElementById("driver-logged-name");
         if (elName) elName.textContent = driver.name;
         const elPlate = document.getElementById("driver-logged-plate");
@@ -677,6 +695,11 @@
         this.renderDriverData();
         this.renderHistoryData();
         this.checkExistingSosAlert();
+
+        // Check for dispatcher safety ping periodically
+        setInterval(() => {
+          this.checkExistingSosAlert();
+        }, 4000);
 
         window.store.subscribe(() => {
           this.renderDriverData();
@@ -1157,6 +1180,9 @@
         const incidentObj = {
           id: "SOS-" + Date.now().toString(36),
           driverId: this.activeDriverId,
+          driverName: this.driverProfile?.name || "พนักงานขับรถ",
+          plate: this.driverProfile?.vehiclePlate || "ชบ.74-0549",
+          vehicleId: this.activeVehicleId || "V-07",
           type: type,
           typeLabel: typeLabels[type] || "เหตุฉุกเฉิน",
           detail: detail,
@@ -1181,6 +1207,34 @@
         } else if (banner) {
           banner.classList.add("hidden");
         }
+
+        // Also check if dispatcher sent a safety check-in ping
+        this.checkSafetyPing();
+      },
+
+      checkSafetyPing() {
+        const vId = this.activeVehicleId || "V-07";
+        const pingKey = `NEXTROUTE_PING_${vId}`;
+        const raw = localStorage.getItem(pingKey);
+        const banner = document.getElementById("driver-safety-check-banner");
+        const desc = document.getElementById("driver-safety-check-desc");
+        if (raw && banner) {
+          try {
+            const data = JSON.parse(raw);
+            if (desc) desc.textContent = `${data.message} (${data.time} น.)`;
+          } catch(e) {}
+          banner.classList.remove("hidden");
+        } else if (banner) {
+          banner.classList.add("hidden");
+        }
+      },
+
+      confirmSafetyOk() {
+        const vId = this.activeVehicleId || "V-07";
+        const pingKey = `NEXTROUTE_PING_${vId}`;
+        localStorage.removeItem(pingKey);
+        this.checkSafetyPing();
+        this.showToast("ยืนยันความปลอดภัยเรียบร้อย ส่งข้อมูลกลับศูนย์ควบคุมแล้ว 🟢", "success");
       },
 
       clearEmergencyAlert() {

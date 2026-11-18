@@ -111,6 +111,41 @@
       </div>
 
       <div class="flex items-center gap-4">
+        <!-- Smart Fleet Safety Notification Bell -->
+        <div class="relative">
+          <button type="button" id="btn-safety-alerts-toggle" onclick="window.SafetyAlerts.toggleDropdown()" class="p-2 relative text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer" title="ศูนย์แจ้งเตือนความปลอดภัยกองรถ">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+            </svg>
+            <span id="safety-alert-badge" class="hidden absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-600 text-[10px] font-bold text-white shadow-xs">
+              0
+            </span>
+          </button>
+
+          <!-- Dropdown Popup -->
+          <div id="safety-alerts-dropdown" class="hidden absolute right-0 mt-2 w-96 max-w-[90vw] bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-50">
+            <div class="p-3.5 bg-slate-900 text-white flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="text-base">🚨</span>
+                <div>
+                  <h4 class="text-xs font-bold leading-tight">การแจ้งเตือนความปลอดภัย</h4>
+                  <div class="text-[10px] text-slate-400">ตรวจจับเรียลไทม์ (AI Safety FSM)</div>
+                </div>
+              </div>
+              <button type="button" id="btn-toggle-sound" onclick="window.SafetyAlerts.toggleSound()" class="text-[10px] px-2 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-slate-200 font-bold transition">
+                🔊 เปิดเสียง
+              </button>
+            </div>
+            <div id="safety-alerts-dropdown-list" class="max-h-80 overflow-y-auto divide-y divide-slate-100">
+              <!-- Dynamically populated -->
+            </div>
+            <div class="p-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px]">
+              <span class="text-slate-400">NextRoute Fleet Safety</span>
+              <button type="button" onclick="window.SafetyAlerts.toggleDropdown()" class="font-bold text-blue-600 hover:underline">ปิด</button>
+            </div>
+          </div>
+        </div>
+
         <!-- Live Clock & Date -->
         <div class="hidden md:flex flex-col text-right">
           <span id="header-live-time" class="text-xs font-bold font-mono text-slate-800">--:--:--</span>
@@ -135,10 +170,16 @@
     <!-- Scrollable Content Area -->
     <div class="flex-1 overflow-y-auto p-6">
 
+      <!-- Fleet Emergency Banner (Shown on Critical Idle > 1 hr or SOS) -->
+      <div id="fleet-emergency-banner" style="display: none;"></div>
+
       <!-- ===============================================================
            TAB 1: DASHBOARD
       =============================================================== -->
       <div id="pane-dashboard" class="tab-pane space-y-6">
+
+        <!-- Fleet Safety & Live Alerts Hub -->
+        <div id="dashboard-safety-hub"></div>
         <!-- Live Map & Status Side by Side -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <!-- Interactive Map Container -->
@@ -1409,6 +1450,7 @@
   <script src="js/eta.js"></script>
   <script src="js/map.js"></script>
   <script src="js/gps-sync.js"></script>
+  <script src="js/safety-alerts.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
