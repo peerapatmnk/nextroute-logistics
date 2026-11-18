@@ -118,7 +118,7 @@ class SafetyAlertsService {
         const idleSince = this.idleTimers[v.id];
         const idleMins = Math.floor((now - idleSince) / (60 * 1000));
 
-        // Rule 2.1: CRITICAL Idle > 60 Minutes (ความเสี่ยงอุบัติเหตุร้ายแรง / คนขับหมดสติ)
+        // Rule 2: CRITICAL Idle > 60 Minutes (ความเสี่ยงอุบัติเหตุร้ายแรง / คนขับหมดสติ)
         if (idleMins >= 60) {
           newAlerts.push({
             id: `idle_crit_${v.id}`,
@@ -139,81 +139,11 @@ class SafetyAlertsService {
             isCriticalIdle: true
           });
         }
-        // Rule 2.2: WARNING Idle 30-59 Minutes (เฝ้าระวัง / สิ้นเปลืองพลังงาน)
-        else if (idleMins >= 30) {
-          newAlerts.push({
-            id: `idle_warn_${v.id}`,
-            type: "idle_warning",
-            level: "warning", // 🟡
-            badgeText: "🟡 จอดติดเครื่องนาน (> 30 นาที)",
-            title: `จอดติดเครื่องยนต์นาน ${idleMins} นาที`,
-            desc: `รถจอดติดเครื่องยนต์สะสม ${idleMins} นาที ที่ "${v.address || "ลานศูนย์"}" สิ้นเปลืองเชื้อเพลิงและเสี่ยงความร้อนสะสม`,
-            vehicleId: v.id,
-            plate: v.plate,
-            driverName: v.driverName || driver.name,
-            phone: driverPhone,
-            address: v.address,
-            lat: v.lat,
-            lng: v.lng,
-            durationMins: idleMins,
-            timestamp: new Date(idleSince).toISOString()
-          });
-        }
       } else {
         // Not idle anymore, reset idle timer unless simulated
         if (!this.simulationOverrides[v.id]?.forceIdle) {
           delete this.idleTimers[v.id];
         }
-      }
-
-      // ---------------------------------------------------------------
-      // Rule 4: DLT Fatigue Driving (> 4 Hours Continuous)
-      // ---------------------------------------------------------------
-      if (v.status === "running" || this.simulationOverrides[v.id]?.forceFatigue) {
-        // If simulation or actual long running job
-        if (this.simulationOverrides[v.id]?.forceFatigue || v.id === "V-11") {
-          newAlerts.push({
-            id: `fatigue_${v.id}`,
-            type: "fatigue_dlt",
-            level: "warning", // 🟠
-            badgeText: "🟠 ขับต่อเนื่องเกิน 4 ชม. (DLT)",
-            title: `ขับรถต่อเนื่องเกิน 4 ชั่วโมงตามกฎหมาย DLT`,
-            desc: `รถกำลังวิ่งด้วยความเร็ว ${v.speed || 70} กม./ชม. ขับต่อเนื่องเกิน 4 ชม. ต้องให้คนขับหยุดพักอย่างน้อย 30 นาที ป้องกันอาการหลับใน`,
-            vehicleId: v.id,
-            plate: v.plate,
-            driverName: v.driverName || driver.name,
-            phone: driverPhone,
-            address: v.address,
-            lat: v.lat,
-            lng: v.lng,
-            speed: v.speed,
-            timestamp: new Date().toISOString()
-          });
-        }
-      }
-
-      // ---------------------------------------------------------------
-      // Rule 5: Hazardous Cargo Speeding (> 80 km/h)
-      // ---------------------------------------------------------------
-      if (v.speed > 80 || this.simulationOverrides[v.id]?.forceSpeed) {
-        const curSpd = this.simulationOverrides[v.id]?.forceSpeed ? 92 : v.speed;
-        newAlerts.push({
-          id: `speed_${v.id}`,
-          type: "speed_violation",
-          level: "warning", // ⚠️
-          badgeText: "⚠️ ความเร็วเกินเกณฑ์กำหนด",
-          title: `ขับเร็วเกินเกณฑ์ความปลอดภัย (${curSpd} กม./ชม.)`,
-          desc: `ตรวจพบความเร็ว ${curSpd} กม./ชม. เกินเกณฑ์ความปลอดภัยขนส่งวัตถุอันตราย 80 กม./ชม. เสี่ยงอุบัติเหตุพลิกคว่ำ`,
-          vehicleId: v.id,
-          plate: v.plate,
-          driverName: v.driverName || driver.name,
-          phone: driverPhone,
-          address: v.address,
-          lat: v.lat,
-          lng: v.lng,
-          speed: curSpd,
-          timestamp: new Date().toISOString()
-        });
       }
     });
 
@@ -310,13 +240,9 @@ class SafetyAlertsService {
             <span class="text-xs text-rose-100 font-bold whitespace-nowrap">📞 เบอร์โทรติดต่อคนขับ:</span>
             <span class="font-mono text-sm font-black text-white select-all tracking-wider">${top.phone}</span>
           </div>
-          <!-- Zoom to GPS Map -->
-          <button type="button" onclick="window.SafetyAlerts.locateVehicle('${top.vehicleId}')" class="px-4 py-2 bg-white text-rose-800 hover:bg-rose-50 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 shadow-sm whitespace-nowrap cursor-pointer">
-            <span>📍 ซูมดูพิกัด GPS</span>
-          </button>
           <!-- Dismiss -->
-          <button type="button" onclick="window.SafetyAlerts.dismissAlert('${top.id}')" class="p-2 text-rose-200 hover:text-white rounded-lg hover:bg-white/10 transition cursor-pointer" title="รับทราบและปิดการเตือนนี้">
-            ✕
+          <button type="button" onclick="window.SafetyAlerts.dismissAlert('${top.id}')" class="px-3 py-2 text-rose-200 hover:text-white rounded-xl hover:bg-white/10 transition cursor-pointer text-xs font-bold" title="รับทราบและปิดการเตือนนี้">
+            ✕ ปิดรับทราบ
           </button>
         </div>
       `;
@@ -330,17 +256,17 @@ class SafetyAlertsService {
     if (!hubContainer) return;
 
     const criticalCount = this.alerts.filter(a => a.level === "critical").length;
-    const warningCount = this.alerts.filter(a => a.level === "warning").length;
-    const idleCount = this.alerts.filter(a => a.type.startsWith("idle")).length;
-    const safeCount = Math.max(0, 14 - (criticalCount + warningCount));
+    const sosCount = this.alerts.filter(a => a.isSos).length;
+    const idleCritCount = this.alerts.filter(a => a.isCriticalIdle).length;
+    const safeCount = Math.max(0, 14 - criticalCount);
 
     let alertItemsHtml = "";
     if (this.alerts.length === 0) {
       alertItemsHtml = `
         <div class="p-8 text-center bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
           <div class="text-3xl mb-2">🛡️</div>
-          <div class="text-sm font-bold text-slate-800">ระบบเฝ้าระวังความปลอดภัย: สถานะปกติทุกคัน</div>
-          <div class="text-xs text-slate-500 mt-1">รถทั้ง 14 คันไม่อยู่ในภาวะเสี่ยง ไม่พบการจอดติดเครื่องยนต์เกินเวลา หรือความเร็วเกินกำหนด</div>
+          <div class="text-sm font-bold text-slate-800">ระบบเฝ้าระวังเหตุฉุกเฉิน: สถานะปกติทุกคัน</div>
+          <div class="text-xs text-slate-500 mt-1">รถทั้ง 14 คันไม่อยู่ในภาวะวิกฤต ไม่พบสัญญาณขอความช่วยเหลือ SOS หรือการจอดติดเครื่องยนต์นานเกิน 1 ชั่วโมง</div>
         </div>
       `;
     } else {
@@ -361,13 +287,13 @@ class SafetyAlertsService {
             </div>
             <div>
               <div class="flex items-center gap-2">
-                <h3 class="text-sm font-bold text-slate-900">ศูนย์เฝ้าระวังความปลอดภัยและแจ้งเตือนฉุกเฉิน (Fleet Safety & Live Alerts)</h3>
+                <h3 class="text-sm font-bold text-slate-900">ศูนย์เฝ้าระวังเหตุฉุกเฉินวิกฤต (Fleet Emergency & Live SOS Hub)</h3>
                 <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping"></span>
-                  ระบบ Real-Time AI FSM
+                  ระบบ Real-Time SOS Alert
                 </span>
               </div>
-              <p class="text-xs text-slate-500 mt-0.5">ตรวจจับจอดติดเครื่องนานเกิน 1 ชม., อาการเหนื่อยล้า DLT เกิน 4 ชม., และความเร็วเกินพิกัด</p>
+              <p class="text-xs text-slate-500 mt-0.5">แจ้งเตือนเฉพาะเหตุฉุกเฉินวิกฤตจริง: สัญญาณขอความช่วยเหลือ SOS จากคนขับ และการจอดติดเครื่องยนต์นานเกิน 1 ชั่วโมง</p>
             </div>
           </div>
 
@@ -385,27 +311,22 @@ class SafetyAlertsService {
           </div>
         </div>
 
-        <!-- 4 KPI Summary Counters -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div class="p-3 rounded-xl bg-rose-50 border border-rose-200">
-            <div class="text-[11px] font-bold text-rose-700">จอดติดเครื่องวิกฤต (> 1 ชม.)</div>
-            <div class="text-2xl font-black text-rose-900 mt-0.5 font-mono">${criticalCount} <span class="text-xs font-normal text-rose-600">คัน</span></div>
-            <div class="text-[10px] text-rose-500 mt-0.5">เสี่ยงอุบัติเหตุ / คนขับหมดสติ</div>
+        <!-- 3 KPI Summary Counters for Critical Emergencies -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="p-3.5 rounded-xl bg-rose-50 border border-rose-200">
+            <div class="text-[11px] font-bold text-rose-700">🚨 สัญญาณฉุกเฉิน SOS (จากคนขับ)</div>
+            <div class="text-2xl font-black text-rose-900 mt-0.5 font-mono">${sosCount} <span class="text-xs font-normal text-rose-600">รายการ</span></div>
+            <div class="text-[10px] text-rose-500 mt-0.5">คนขับกดขอความช่วยเหลือด่วน</div>
           </div>
-          <div class="p-3 rounded-xl bg-amber-50 border border-amber-200">
-            <div class="text-[11px] font-bold text-amber-700">จอดติดเครื่องนาน (> 30 น.)</div>
-            <div class="text-2xl font-black text-amber-900 mt-0.5 font-mono">${idleCount} <span class="text-xs font-normal text-amber-600">คัน</span></div>
-            <div class="text-[10px] text-amber-500 mt-0.5">สิ้นเปลืองเชื้อเพลิง / รอตรวจสอบ</div>
+          <div class="p-3.5 rounded-xl bg-red-50 border border-red-200">
+            <div class="text-[11px] font-bold text-red-700">⏱️ จอดติดเครื่องวิกฤต (> 1 ชม.)</div>
+            <div class="text-2xl font-black text-red-900 mt-0.5 font-mono">${idleCritCount} <span class="text-xs font-normal text-red-600">คัน</span></div>
+            <div class="text-[10px] text-red-500 mt-0.5">เสี่ยงอุบัติเหตุ / คนขับหมดสติ</div>
           </div>
-          <div class="p-3 rounded-xl bg-purple-50 border border-purple-200">
-            <div class="text-[11px] font-bold text-purple-700">เตือนเฝ้าระวัง DLT & ความเร็ว</div>
-            <div class="text-2xl font-black text-purple-900 mt-0.5 font-mono">${warningCount} <span class="text-xs font-normal text-purple-600">รายการ</span></div>
-            <div class="text-[10px] text-purple-500 mt-0.5">ขับเกิน 4 ชม. หรือเร็วเกินเกณฑ์</div>
-          </div>
-          <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
-            <div class="text-[11px] font-bold text-emerald-700">ยานพาหนะขับขี่ปกติ</div>
+          <div class="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200">
+            <div class="text-[11px] font-bold text-emerald-700">🛡️ ยานพาหนะสถานะปกติ</div>
             <div class="text-2xl font-black text-emerald-900 mt-0.5 font-mono">${safeCount} <span class="text-xs font-normal text-emerald-600">คัน</span></div>
-            <div class="text-[10px] text-emerald-500 mt-0.5">สถานะปกติจาก NWT GPS</div>
+            <div class="text-[10px] text-emerald-500 mt-0.5">ไม่มีเหตุฉุกเฉิน (สดจาก NWT GPS)</div>
           </div>
         </div>
 
@@ -434,7 +355,7 @@ class SafetyAlertsService {
           <div class="text-[11px] text-slate-500 leading-snug line-clamp-2">${a.desc}</div>
           <div class="flex items-center justify-between pt-1 text-[11px]">
             <span class="font-bold text-slate-700">📞 ติดต่อคนขับ: <span class="font-mono text-rose-600 font-black select-all">${a.phone}</span></span>
-            <button onclick="window.SafetyAlerts.locateVehicle('${a.vehicleId}')" class="text-blue-600 font-bold hover:underline cursor-pointer">📍 ดูพิกัด</button>
+            <button onclick="window.SafetyAlerts.dismissAlert('${a.id}')" class="text-slate-400 hover:text-slate-600 text-[10px]">✕ รับทราบ</button>
           </div>
         </div>
       `;
@@ -468,15 +389,12 @@ class SafetyAlertsService {
           </div>
         </div>
 
-        <div class="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-200/60">
-          <button type="button" onclick="window.SafetyAlerts.locateVehicle('${a.vehicleId}')" class="flex-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs whitespace-nowrap cursor-pointer">
-            <span>📍 ซูมดูพิกัด GPS</span>
-          </button>
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200/60">
           <button type="button" onclick="window.SafetyAlerts.sendSafetyPing('${a.vehicleId}', '${a.driverName}')" class="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-xs whitespace-nowrap cursor-pointer" title="ส่งสัญญาณสอบถามความปลอดภัยไปยังหน้าจอมือถือคนขับ">
-            <span>💬 ทักถามสถานะ</span>
+            <span>💬 ทักถามสถานะคนขับ</span>
           </button>
-          <button type="button" onclick="window.SafetyAlerts.dismissAlert('${a.id}')" class="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200 transition cursor-pointer" title="รับทราบการเตือนนี้">
-            ✕
+          <button type="button" onclick="window.SafetyAlerts.dismissAlert('${a.id}')" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition cursor-pointer" title="รับทราบการเตือนนี้">
+            ✕ ปิดรับทราบ
           </button>
         </div>
       </div>
