@@ -2,7 +2,7 @@
     "provider":  "NWT Tracking System (Cloud Run)",
     "companyName":  "บริษัท เน็คท์รูท โลจิสติกส์ จำกัด",
     "memberId":  "668ecf8127ebf79f22f0a802",
-    "syncTime":  "2026-11-18 13:53:44",
+    "syncTime":  "2026-11-18 13:57:52",
     "totalVehicles":  14,
     "runningCount":  5,
     "idleCount":  1,
@@ -30,7 +30,7 @@
                          "fuelLevel":  75,
                          "odometerKm":  175635,
                          "address":  "ลานจอดศูนย์ เน็คท์รูท (NRL ชลบุรี)",
-                         "lastUpdate":  "สดจากดาวเทียม NWT (13:53:43)"
+                         "lastUpdate":  "สดจากดาวเทียม NWT (13:57:51)"
                      },
                      {
                          "id":  "V-02",
@@ -54,7 +54,7 @@
                          "fuelLevel":  75,
                          "odometerKm":  182749,
                          "address":  "ลานจอดศูนย์ เน็คท์รูท (NRL ชลบุรี)",
-                         "lastUpdate":  "สดจากดาวเทียม NWT (13:53:43)"
+                         "lastUpdate":  "สดจากดาวเทียม NWT (13:57:51)"
                      },
                      {
                          "id":  "V-03",
@@ -72,13 +72,13 @@
                          "driverName":  "นายจินดา พิชวนชม",
                          "driverNameEn":  "MR. CHINDA PHISCHUANCHOM",
                          "status":  "running",
-                         "lat":  16.0770666,
-                         "lng":  102.7238866,
-                         "speed":  68,
+                         "lat":  16.0687116,
+                         "lng":  102.72057,
+                         "speed":  38,
                          "fuelLevel":  75,
-                         "odometerKm":  170915,
+                         "odometerKm":  170916,
                          "address":  "ต.ในเมือง อ.บ้านไผ่ จ.ขอนแก่น",
-                         "lastUpdate":  "สดจากดาวเทียม NWT (13:53:43)"
+                         "lastUpdate":  "สดจากดาวเทียม NWT (13:57:51)"
                      },
                      {
                          "id":  "V-04",
@@ -102,7 +102,7 @@
                          "fuelLevel":  75,
                          "odometerKm":  178990,
                          "address":  "ลานจอดศูนย์ เน็คท์รูท (NRL ชลบุรี)",
-                         "lastUpdate":  "สดจากดาวเทียม NWT (13:53:43)"
+                         "lastUpdate":  "สดจากดาวเทียม NWT (13:57:51)"
                      },
                      {
                          "id":  "V-05",
@@ -126,7 +126,7 @@
                          "fuelLevel":  75,
                          "odometerKm":  88376,
                          "address":  "ลานจอดศูนย์ เน็คท์รูท (NRL ชลบุรี)",
-                         "lastUpdate":  "สดจากดาวเทียม NWT (13:53:43)"
+                         "lastUpdate":  "สดจากดาวเทียม NWT (13:57:51)"
                      },
                      {
                          "id":  "V-06",
@@ -150,7 +150,7 @@
                          "fuelLevel":  75,
                          "odometerKm":  206671,
                          "address":  "ลานจอดศูนย์ เน็คท์รูท (NRL ชลบุรี)",
-                         "lastUpdate":  "สดจากดาวเทียม NWT (13:53:43)"
+                         "lastUpdate":  "สดจากดาวเทียม NWT (13:57:51)"
                      },
                      {
                          "id":  "V-07",
@@ -174,7 +174,7 @@
                          "fuelLevel":  75,
                          "odometerKm":  201234,
                          "address":  "ลานจอดศูนย์ เน็คท์รูท (NRL ชลบุรี)",
-                         "lastUpdate":  "สดจากดาวเทียม NWT (13:53:43)"
+                         "lastUpdate":  "สดจากดาวเทียม NWT (13:57:51)"
                      },
                      {
                          "id":  "V-08",
@@ -198,7 +198,7 @@
                          "fuelLevel":  75,
                          "odometerKm":  207820,
                          "address":  "ลานจอดศูนย์ เน็คท์รูท (NRL ชลบุรี)",
-                         "lastUpdate":  "สดจากดาวเทียม NWT (13:53:43)"
+                         "lastUpdate":  "สดจากดาวเทียม NWT (13:57:51)"
                      },
                      {
                          "id":  "V-09",
@@ -222,7 +222,7 @@
                          "fuelLevel":  75,
                          "odometerKm":  150000,
                          "address":  "ลานจอดศูนย์ เน็คท์รูท (NRL ชลบุรี)",
-                         "lastUpdate":  "สดจากดาวเทียม NWT (13:53:43)"
+                         "lastUpdate":  "สดจากดาวเทียม NWT (13:57:51)"
                      },
                      {
                          "id":  "V-10",
@@ -240,13 +240,13 @@
                          "driverName":  "สำรอง / ประจำศูนย์ NRL",
                          "driverNameEn":  "SPARE TRUCK NRL",
                          "status":  "running",
-                         "lat":  15.7833733,
-                         "lng":  104.0882649,
-                         "speed":  58,
+                         "lat":  15.8098349,
+                         "lng":  104.1169716,
+                         "speed":  62,
                          "fuelLevel":  75,
-                         "odometerKm":  101501,
-                         "address":  "ต.ชานุวรรณ อ.พนมไพร จ.ร้อยเอ็ด",
-                         "lastUpdate":  "สดจากดาวเทียม NWT (13:53:43)"
+                         "odometerKm":  101505,
+                         "address":  "ต.สำราญ อ.เมืองยโสธร จ.ยโสธร",
+                         "lastUpdate":  "สดจากดาวเทียม NWT (13:57:51)"
                      },
                      {
                          "id":  "V-11",
@@ -264,13 +264,13 @@
                          "driverName":  "นายน้อม กะปรัม",
                          "driverNameEn":  "MR. NOM KAPRAM",
                          "status":  "running",
-                         "lat":  17.8612516,
-                         "lng":  102.7269166,
-                         "speed":  51,
+                         "lat":  17.8250483,
+                         "lng":  102.7424216,
+                         "speed":  70,
                          "fuelLevel":  75,
-                         "odometerKm":  169215,
-                         "address":  "ต.มีชัย อ.เมืองหนองคาย จ.หนองคาย",
-                         "lastUpdate":  "สดจากดาวเทียม NWT (13:53:43)"
+                         "odometerKm":  169220,
+                         "address":  "ต.หนองกอมเกาะ อ.เมืองหนองคาย จ.หนองคาย",
+                         "lastUpdate":  "สดจากดาวเทียม NWT (13:57:51)"
                      },
                      {
                          "id":  "V-12",
@@ -288,13 +288,13 @@
                          "driverName":  "นายประทีป อินทาโนะ",
                          "driverNameEn":  "MR. PRATHIP INTANO",
                          "status":  "running",
-                         "lat":  16.561885,
-                         "lng":  102.8248133,
-                         "speed":  70,
+                         "lat":  16.5187133,
+                         "lng":  102.83247,
+                         "speed":  71,
                          "fuelLevel":  75,
-                         "odometerKm":  188246,
+                         "odometerKm":  188250,
                          "address":  "ต.สำราญ อ.เมืองขอนแก่น จ.ขอนแก่น",
-                         "lastUpdate":  "สดจากดาวเทียม NWT (13:53:43)"
+                         "lastUpdate":  "สดจากดาวเทียม NWT (13:57:51)"
                      },
                      {
                          "id":  "V-13",
@@ -312,13 +312,13 @@
                          "driverName":  "นายอานนท์ อุ่นกะสัง",
                          "driverNameEn":  "MR. ARNON AUNKASANG",
                          "status":  "running",
-                         "lat":  16.07365,
-                         "lng":  102.722465,
-                         "speed":  67,
+                         "lat":  16.0682066,
+                         "lng":  102.72033,
+                         "speed":  44,
                          "fuelLevel":  75,
                          "odometerKm":  192397,
                          "address":  "ต.ในเมือง อ.บ้านไผ่ จ.ขอนแก่น",
-                         "lastUpdate":  "สดจากดาวเทียม NWT (13:53:43)"
+                         "lastUpdate":  "สดจากดาวเทียม NWT (13:57:51)"
                      },
                      {
                          "id":  "V-14",
@@ -336,13 +336,13 @@
                          "driverName":  "นายจิรพัฒน์ สงนอก",
                          "driverNameEn":  "MR. CHIRAPHAT SONGNOK",
                          "status":  "idle",
-                         "lat":  13.2083816,
-                         "lng":  101.0001683,
+                         "lat":  13.2084416,
+                         "lng":  100.9998833,
                          "speed":  0,
                          "fuelLevel":  75,
                          "odometerKm":  242444,
-                         "address":  "ลานจอดศูนย์ เน็คท์รูท (NRL ชลบุรี)",
-                         "lastUpdate":  "สดจากดาวเทียม NWT (13:53:43)"
+                         "address":  "ต.บางพระ อ.ศรีราชา จ.ชลบุรี",
+                         "lastUpdate":  "สดจากดาวเทียม NWT (13:57:51)"
                      }
                  ]
 }
