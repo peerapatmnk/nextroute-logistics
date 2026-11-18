@@ -176,6 +176,7 @@ const App = {
         center: [13.40, 101.30],
         zoom: 8
       });
+      this.mapManagers.gps.renderVehicles();
     }
   },
 
@@ -1161,6 +1162,11 @@ const App = {
      3. GPS Tracking Render (ผสานการคำนวณระยะทางคงเหลือและ Live ETA)
   ===================================================================== */
   renderGpsTracking() {
+    if (this.mapManagers.gps && this.mapManagers.gps.map) {
+      this.mapManagers.gps.map.invalidateSize();
+      this.mapManagers.gps.renderVehicles();
+    }
+
     const vehicles = window.store.getVehicles();
     const jobs = window.store.getJobs();
     const listContainer = document.getElementById("gps-vehicle-list");
@@ -1217,8 +1223,15 @@ const App = {
   },
 
   focusVehicleOnMap(vehicleId) {
-    if (this.mapManagers.gps) {
+    if (this.mapManagers.gps && this.mapManagers.gps.map) {
+      this.mapManagers.gps.map.invalidateSize();
+      if (!this.mapManagers.gps.markers || Object.keys(this.mapManagers.gps.markers).length === 0) {
+        this.mapManagers.gps.renderVehicles();
+      }
       this.mapManagers.gps.focusVehicle(vehicleId);
+    }
+    if (this.mapManagers.dashboard && this.mapManagers.dashboard.map) {
+      this.mapManagers.dashboard.focusVehicle(vehicleId);
     }
   },
 
@@ -2757,6 +2770,10 @@ const App = {
     }, 3500);
   }
 };
+
+if (typeof window !== "undefined") {
+  window.App = App;
+}
 
 // Initialize on DOM load
 window.addEventListener("DOMContentLoaded", () => {

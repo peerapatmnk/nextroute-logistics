@@ -304,18 +304,18 @@ class SafetyAlertsService {
           </div>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2 shrink-0 w-full lg:w-auto">
-          <a href="tel:${top.phone}" class="flex-1 lg:flex-none px-3.5 py-2 bg-white text-rose-700 hover:bg-rose-50 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm whitespace-nowrap">
-            <span>📞 โทรหาคนขับ</span>
-            <span class="font-mono text-[11px] text-rose-900 font-normal">(${top.phone})</span>
-          </a>
-          <button type="button" onclick="window.SafetyAlerts.locateVehicle('${top.vehicleId}')" class="flex-1 lg:flex-none px-3.5 py-2 bg-rose-900/60 hover:bg-rose-900 text-white border border-rose-400/50 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm whitespace-nowrap">
+        <div class="flex flex-wrap items-center gap-2.5 shrink-0 w-full lg:w-auto">
+          <!-- Driver Contact Number Badge for Desktop Admin -->
+          <div class="px-3.5 py-2 bg-white/20 backdrop-blur-xs border border-white/30 rounded-xl text-white flex items-center gap-2 shadow-xs">
+            <span class="text-xs text-rose-100 font-bold whitespace-nowrap">📞 เบอร์โทรติดต่อคนขับ:</span>
+            <span class="font-mono text-sm font-black text-white select-all tracking-wider">${top.phone}</span>
+          </div>
+          <!-- Zoom to GPS Map -->
+          <button type="button" onclick="window.SafetyAlerts.locateVehicle('${top.vehicleId}')" class="px-4 py-2 bg-white text-rose-800 hover:bg-rose-50 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 shadow-sm whitespace-nowrap cursor-pointer">
             <span>📍 ซูมดูพิกัด GPS</span>
           </button>
-          <a href="tel:1669" class="px-3 py-2 bg-red-950/80 hover:bg-red-950 text-red-200 border border-red-500/50 rounded-xl text-xs font-bold transition flex items-center gap-1 whitespace-nowrap" title="สายด่วนการแพทย์ฉุกเฉิน 1669">
-            <span>🚑 โทร 1669</span>
-          </a>
-          <button type="button" onclick="window.SafetyAlerts.dismissAlert('${top.id}')" class="p-2 text-rose-200 hover:text-white rounded-lg hover:bg-white/10 transition" title="รับทราบและปิดการเตือนนี้">
+          <!-- Dismiss -->
+          <button type="button" onclick="window.SafetyAlerts.dismissAlert('${top.id}')" class="p-2 text-rose-200 hover:text-white rounded-lg hover:bg-white/10 transition cursor-pointer" title="รับทราบและปิดการเตือนนี้">
             ✕
           </button>
         </div>
@@ -433,8 +433,8 @@ class SafetyAlertsService {
           <div class="text-xs font-bold text-slate-800 leading-tight">${a.title}</div>
           <div class="text-[11px] text-slate-500 leading-snug line-clamp-2">${a.desc}</div>
           <div class="flex items-center justify-between pt-1 text-[11px]">
-            <a href="tel:${a.phone}" class="font-bold text-rose-600 hover:underline">📞 โทร ${a.phone}</a>
-            <button onclick="window.SafetyAlerts.locateVehicle('${a.vehicleId}')" class="text-blue-600 font-bold hover:underline">📍 ดูพิกัด</button>
+            <span class="font-bold text-slate-700">📞 ติดต่อคนขับ: <span class="font-mono text-rose-600 font-black select-all">${a.phone}</span></span>
+            <button onclick="window.SafetyAlerts.locateVehicle('${a.vehicleId}')" class="text-blue-600 font-bold hover:underline cursor-pointer">📍 ดูพิกัด</button>
           </div>
         </div>
       `;
@@ -452,7 +452,13 @@ class SafetyAlertsService {
           <h4 class="text-xs font-black text-slate-900 leading-snug">${a.title}</h4>
           <p class="text-xs text-slate-600 mt-1 leading-relaxed">${a.desc}</p>
 
-          <div class="mt-3 pt-2.5 border-t border-slate-200/60 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
+          <!-- Driver Phone Box for Desktop Admin -->
+          <div class="mt-2.5 p-2 bg-white/90 rounded-lg border border-slate-200 flex items-center justify-between text-xs">
+            <span class="font-bold text-slate-700">📞 เบอร์โทรติดต่อคนขับ:</span>
+            <span class="font-mono font-black text-rose-700 text-xs select-all bg-rose-50 px-2 py-0.5 rounded border border-rose-200 tracking-wider">${a.phone}</span>
+          </div>
+
+          <div class="mt-2.5 pt-2 border-t border-slate-200/60 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
             <div>
               <span>คนขับ:</span> <strong class="text-slate-800">${a.driverName}</strong>
             </div>
@@ -463,17 +469,13 @@ class SafetyAlertsService {
         </div>
 
         <div class="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-200/60">
-          <a href="tel:${a.phone}" class="flex-1 px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 shadow-xs whitespace-nowrap">
-            <span>📞 โทรหาคนขับ</span>
-            <span class="font-mono text-[10px] opacity-90">(${a.phone})</span>
-          </a>
-          <button type="button" onclick="window.SafetyAlerts.locateVehicle('${a.vehicleId}')" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-xs whitespace-nowrap">
-            <span>📍 ดูแผนที่</span>
+          <button type="button" onclick="window.SafetyAlerts.locateVehicle('${a.vehicleId}')" class="flex-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs whitespace-nowrap cursor-pointer">
+            <span>📍 ซูมดูพิกัด GPS</span>
           </button>
-          <button type="button" onclick="window.SafetyAlerts.sendSafetyPing('${a.vehicleId}', '${a.driverName}')" class="px-2 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold transition whitespace-nowrap" title="ส่งสัญญาณสอบถามความปลอดภัยไปยังหน้าจอมือถือคนขับ">
+          <button type="button" onclick="window.SafetyAlerts.sendSafetyPing('${a.vehicleId}', '${a.driverName}')" class="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-xs whitespace-nowrap cursor-pointer" title="ส่งสัญญาณสอบถามความปลอดภัยไปยังหน้าจอมือถือคนขับ">
             <span>💬 ทักถามสถานะ</span>
           </button>
-          <button type="button" onclick="window.SafetyAlerts.dismissAlert('${a.id}')" class="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200 transition" title="รับทราบการเตือนนี้">
+          <button type="button" onclick="window.SafetyAlerts.dismissAlert('${a.id}')" class="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200 transition cursor-pointer" title="รับทราบการเตือนนี้">
             ✕
           </button>
         </div>
@@ -486,16 +488,34 @@ class SafetyAlertsService {
   // -------------------------------------------------------------------
   locateVehicle(vehicleId) {
     console.log(`📍 [SafetyAlerts] Locating vehicle ${vehicleId} on GPS map...`);
-    if (window.App) {
-      window.App.switchTab("gps-tracking");
-      setTimeout(() => {
-        if (window.App.focusVehicleOnMap) {
-          window.App.focusVehicleOnMap(vehicleId);
-        }
-      }, 350);
-      if (window.App.showToast) {
-        window.App.showToast(`📍 กำลังเปิดแผนที่ดาวเทียมคัน ${vehicleId}`, "info");
+    const app = window.App || (typeof App !== "undefined" ? App : null);
+    if (!app) {
+      console.error("App controller not found");
+      return;
+    }
+
+    // 1. Switch to GPS Tracking Tab
+    app.switchTab("gps-tracking");
+
+    // 2. Allow tab DOM to render, invalidate size, and focus vehicle
+    setTimeout(() => {
+      app.focusVehicleOnMap(vehicleId);
+
+      const mapEl = document.getElementById("gps-fullscreen-map");
+      if (mapEl) {
+        mapEl.scrollIntoView({ behavior: "smooth", block: "start" });
       }
+    }, 200);
+
+    // Double-ensure after transition completes
+    setTimeout(() => {
+      app.focusVehicleOnMap(vehicleId);
+    }, 450);
+
+    if (app.showToast) {
+      const v = window.store ? window.store.getVehicle(vehicleId) : null;
+      const plate = v ? v.plate : vehicleId;
+      app.showToast(`📍 กำลังซูมตำแหน่ง GPS คัน ${plate}`, "info");
     }
   }
 

@@ -134,6 +134,17 @@ class MapManager {
     if (!this.map || !window.store) return;
     const vehicles = window.store.getVehicles();
 
+    // Check if any vehicle marker has an open popup so we can preserve it across GPS sync ticks
+    let openVehicleId = null;
+    if (this.markers) {
+      for (const [id, m] of Object.entries(this.markers)) {
+        if (m && typeof m.isPopupOpen === "function" && m.isPopupOpen()) {
+          openVehicleId = id;
+          break;
+        }
+      }
+    }
+
     // Clear existing
     Object.values(this.markers).forEach(m => this.map.removeLayer(m));
     this.markers = {};
@@ -201,6 +212,9 @@ class MapManager {
       `);
 
       this.markers[v.id] = marker;
+      if (openVehicleId && v.id === openVehicleId) {
+        marker.openPopup();
+      }
     });
   }
 
