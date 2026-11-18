@@ -403,10 +403,10 @@ const App = {
       const restCount = job.restCount ?? tripPlan?.restStopsCount ?? (job.hasRestStop ? 1 : 0);
       if (restCount > 0 || restMins > 0) {
         elRest.className = "text-amber-700 font-bold";
-        elRest.textContent = `พัก ${restCount || 1} ครั้ง (${restMins || 30} นาที)`;
+        elRest.textContent = `จอดพัก ${restCount || 1} ครั้ง (${restMins || 30} นาที)`;
       } else {
         elRest.className = "text-emerald-700 font-semibold";
-        elRest.textContent = "ไม่ต้องพักระหว่างทาง (< 4 ชม.)";
+        elRest.textContent = "ไม่มี (ไม่ต้องจอดพัก)";
       }
     }
     const elReturnEta = document.getElementById("track-job-return-eta");
@@ -1212,7 +1212,7 @@ const App = {
               <div class="flex items-center justify-between text-[10px] text-slate-500">
                 <span>เหลือ ~${liveEst.remainingDistKm} กม. (${liveEst.remainingText})</span>
                 ${(currentJob.hasRestStop || liveEst.needsRest)
-                  ? '<span class="px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded font-bold">พักกฎ 4 ชม.</span>'
+                  ? '<span class="px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded font-bold">จอดพัก</span>'
                   : ''}
               </div>
             </div>
@@ -1263,7 +1263,7 @@ const App = {
 
     setEl("ms-res-dist", `${plan.totalDistanceKm} กม.`);
     setEl("ms-res-hours", `${plan.totalTripHours} ชม.`);
-    setEl("ms-res-rest", plan.restStopsCount > 0 ? `${plan.restStopsCount} ครั้ง (${plan.totalRestMinutes} น.)` : "ไม่ต้องพัก (< 4 ชม.)");
+    setEl("ms-res-rest", plan.restStopsCount > 0 ? `${plan.restStopsCount} ครั้ง (${plan.totalRestMinutes} น.)` : "ไม่ต้องจอดพัก");
     setEl("ms-res-eta", plan.etaDelivery);
     setEl("ms-res-return", plan.etaReturn);
 
@@ -1332,7 +1332,7 @@ const App = {
           <td class="py-3 px-4 text-slate-600">${d.name}</td>
           <td class="py-3 px-4">
             <div class="font-mono font-semibold text-emerald-700">${j.eta || "-"}</div>
-            ${j.hasRestStop ? `<span class="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[10px] bg-amber-100 text-amber-800 font-semibold">พักรถ ${j.restDurationMinutes || 30} นาที</span>` : ''}
+            ${j.hasRestStop ? `<span class="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[10px] bg-amber-100 text-amber-800 font-semibold">จอดพัก ${j.restDurationMinutes || 30} นาที</span>` : ''}
           </td>
           <td class="py-3 px-4">
             <span class="px-2.5 py-1 text-[11px] font-bold rounded-full badge-status-${status.key}">
@@ -1398,10 +1398,10 @@ const App = {
     if (restBadge) {
       if (plan.restStopsCount > 0) {
         restBadge.className = "px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200";
-        restBadge.textContent = `⚠️ เกิน 4 ชม. พักรถ ${plan.restStopsCount} ครั้ง (+${plan.totalRestMinutes} นาที)`;
+        restBadge.textContent = `⚠️ มีจุดจอดพัก ${plan.restStopsCount} ครั้ง (+${plan.totalRestMinutes} นาที)`;
       } else {
         restBadge.className = "px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700";
-        restBadge.textContent = "✓ ขับไม่เกิน 4 ชม. (ไม่ต้องพักระหว่างทาง)";
+        restBadge.textContent = "✓ ไม่ต้องจอดพัก (ขับไม่เกิน 4 ชม.)";
       }
     }
   },
@@ -2357,7 +2357,7 @@ const App = {
         <div class="flex justify-between"><span>สินค้า:</span> <strong class="text-indigo-700">${job.productType} (${job.productQty})</strong></div>
         <div class="flex justify-between gap-2"><span>เส้นทาง:</span> <strong class="text-slate-800 text-right">${pLoc?.province || "-"} &rarr; ${dLoc?.province || "-"} (${job.routeDistanceKm || "-"} กม.)</strong></div>
         <div class="flex justify-between"><span>เวลาออก / กำหนดถึง ETA:</span> <strong class="font-mono text-emerald-700">${job.departureTime || "-"} / ${job.eta || "-"}</strong></div>
-        ${job.hasRestStop ? `<div class="flex justify-between text-amber-800"><span>กฎพักรถ 4 ชม.:</span> <strong>พัก ${job.restCount || 1} ครั้ง (${job.restDurationMinutes || 30} นาที)</strong></div>` : ''}
+        ${job.hasRestStop ? `<div class="flex justify-between text-amber-800"><span>จุดจอดพัก:</span> <strong>จอดพัก ${job.restCount || 1} ครั้ง (${job.restDurationMinutes || 30} นาที)</strong></div>` : ''}
         ${job.isCrossBorder ? `<div class="flex justify-between text-purple-800 pt-1 border-t border-slate-100"><span>ใบอนุญาตข้ามแดน:</span> <strong class="font-mono">${job.customsPermitNo || "CB-THKH-2026/0491"}</strong></div>` : ''}
       `;
     }

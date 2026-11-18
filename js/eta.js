@@ -74,12 +74,12 @@ const ETAEngine = {
         const progressRatio = drivenInLegMins / Math.max(1, totalLegMins);
         state.milestones.push({
           step: state.milestones.length + 1,
-          title: `จุดพักรถตามกฎความปลอดภัย ครั้งที่ ${state.restStopsCount} (พัก ${restDurationMins} นาที)`,
+          title: `จุดจอดพัก ครั้งที่ ${state.restStopsCount} (${restDurationMins} นาที)`,
           location: "จุดพักรถทางหลวง / ปั๊มน้ำมันมาตรฐาน",
           type: "safety_rest",
           distanceKm: startCumulativeDist + Math.round(legDistKm * progressRatio),
           time: this.formatThaiDateTime(state.curTime),
-          note: `ขับต่อเนื่องครบ ${restIntervalMins / 60} ชม. ตามกฎความปลอดภัย หยุดพัก ${restDurationMins} นาที`
+          note: `ขับต่อเนื่องครบ ${restIntervalMins / 60} ชม. จอดพัก ${restDurationMins} นาที`
         });
 
         state.curTime = new Date(state.curTime.getTime() + restDurationMins * 60000);

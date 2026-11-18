@@ -199,7 +199,7 @@ class MapManager {
                 ` : `<div class="text-[11px] text-slate-500">ETA: ${currentJob.eta || "-"}</div>`}
                 ${(currentJob.hasRestStop || liveEst?.needsRest) ? `
                   <div class="mt-1 px-2 py-1 bg-amber-50 border border-amber-200 rounded text-[10px] text-amber-800 font-semibold">
-                    ⚠️ เส้นทางมีพักรถตามกฎ 4 ชม. (${currentJob.restDurationMinutes || 30} นาที)
+                    ⚠️ มีจุดจอดพัก (${currentJob.restDurationMinutes || 30} นาที)
                   </div>
                 ` : ''}
               </div>

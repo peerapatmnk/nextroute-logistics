@@ -101,7 +101,7 @@
           <div class="flex justify-between"><span>ทะเบียนรถบรรทุก:</span> <strong id="res-plate" class="text-slate-900 font-mono">-</strong></div>
           <div class="flex justify-between"><span>พนักงานขับรถ:</span> <strong id="res-driver" class="text-slate-900">-</strong></div>
           <div class="flex justify-between pt-2 border-t border-slate-200/60"><span>ระยะทางขนส่ง:</span> <strong id="res-distance" class="text-slate-800 font-mono">-</strong></div>
-          <div class="flex justify-between"><span>จุดจอดพักตามกฎ 4 ชม.:</span> <strong id="res-rest-info" class="text-amber-700 font-semibold">-</strong></div>
+          <div class="flex justify-between"><span>จุดจอดพัก:</span> <strong id="res-rest-info" class="text-amber-700 font-semibold">-</strong></div>
         </div>
 
         <!-- Live Map Preview -->
@@ -255,12 +255,12 @@
             elRestInfo.textContent = `พัก ${restCount || 1} ครั้ง (รวม ${restMins || 30} นาที)`;
           }
           if (elEtaNote) {
-            elEtaNote.innerHTML = `<span class="text-emerald-700 font-medium">✓ รวมเวลาโหลดสินค้าและเวลาพักรถตามกฎหมาย (${restMins || 30} นาที) แล้ว</span>`;
+            elEtaNote.innerHTML = `<span class="text-emerald-700 font-medium">✓ รวมเวลาโหลดสินค้าและเวลาจอดพัก (${restMins || 30} นาที) แล้ว</span>`;
           }
         } else {
           if (elRestInfo) {
             elRestInfo.className = "text-emerald-700 font-medium";
-            elRestInfo.textContent = "ไม่มี (ขับต่อเนื่องไม่เกิน 4 ชม.)";
+            elRestInfo.textContent = "ไม่มี (ไม่ต้องจอดพัก)";
           }
           if (elEtaNote) {
             elEtaNote.textContent = `✓ คำนวณรวมเวลาโหลดสินค้าและระยะทาง ${delivDist} กม. แล้ว`;
