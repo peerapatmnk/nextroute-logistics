@@ -192,6 +192,13 @@
         window.addEventListener("nwt:gps-synced", () => {
           this.loadJob(this.currentJobId);
         });
+
+        // Reactive live sync: auto-update tracking status when driver or admin advances steps
+        if (window.store && typeof window.store.subscribe === "function") {
+          window.store.subscribe(() => {
+            this.loadJob(this.currentJobId);
+          });
+        }
       },
 
       initMap() {

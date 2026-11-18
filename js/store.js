@@ -7,6 +7,20 @@ class AppStore {
     this.storageKey = "NEXTROUTE_LOGISTICS_DB_V1";
     this.listeners = [];
     this.state = this.loadState();
+
+    // Cross-tab reactive synchronization (Real-Time sync between Admin, Driver, and Customer Track)
+    if (typeof window !== "undefined") {
+      window.addEventListener("storage", (e) => {
+        if (e.key === this.storageKey && e.newValue) {
+          try {
+            this.state = JSON.parse(e.newValue);
+            this.notify();
+          } catch (err) {
+            console.warn("Storage sync parse error:", err);
+          }
+        }
+      });
+    }
   }
 
   loadState() {
@@ -268,6 +282,10 @@ class AppStore {
         } else if (statusObj.key === "completed") {
           v.status = "ready";
           v.speed = 0;
+          if (job.driverId) {
+            const d = this.getDriver(job.driverId);
+            if (d) d.status = "ready";
+          }
         }
       }
     }
@@ -388,6 +406,11 @@ class AppStore {
     if (newJob.vehicleId) {
       const v = this.getVehicle(newJob.vehicleId);
       if (v) v.status = "assigned";
+    }
+
+    if (newJob.driverId) {
+      const d = this.getDriver(newJob.driverId);
+      if (d) d.status = "on_duty";
     }
 
     this.state.jobs.unshift(newJob);
