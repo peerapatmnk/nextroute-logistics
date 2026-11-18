@@ -191,6 +191,7 @@
   <script src="js/data.js"></script>
   <script src="js/store.js"></script>
   <script src="js/eta.js"></script>
+  <script src="js/highway-routing.js"></script>
   <script src="js/gps-sync.js"></script>
   <script>
     const TrackApp = {
@@ -366,12 +367,31 @@
         if (this.markerVehicle) this.map.removeLayer(this.markerVehicle);
         if (this.markerPickup) this.map.removeLayer(this.markerPickup);
         if (this.markerDropoff) this.map.removeLayer(this.markerDropoff);
+        if (this.routeLineGroup) this.map.removeLayer(this.routeLineGroup);
+
+        this.routeLineGroup = L.featureGroup().addTo(this.map);
 
         this.markerPickup = L.marker([pLoc.lat, pLoc.lng]).addTo(this.map).bindPopup(`<b>จุดรับ:</b> ${pLoc.name}`);
         this.markerDropoff = L.marker([dLoc.lat, dLoc.lng]).addTo(this.map).bindPopup(`<b>จุดส่ง:</b> ${dLoc.name}`);
         this.markerVehicle = L.circleMarker([v.lat, v.lng], { radius: 9, color: '#2563eb', fillColor: '#3b82f6', fillOpacity: 0.9 }).addTo(this.map).bindPopup(`<b>รถขนส่ง:</b> ${v.plate}`);
 
-        const group = new L.featureGroup([this.markerPickup, this.markerDropoff, this.markerVehicle]);
+        const groupPoints = [this.markerPickup, this.markerDropoff, this.markerVehicle];
+
+        if (window.HighwayRouting) {
+          const fullRoute = window.HighwayRouting.getHighwayRoute(pLoc.id, dLoc.id, [pLoc.lat, pLoc.lng], [dLoc.lat, dLoc.lng]);
+          const isEnRoute = job.currentStatusId >= 5 && !(window.store && window.store.isJobCompleted(job));
+          if (isEnRoute) {
+            const split = window.HighwayRouting.splitHighwayRouteAtVehicle(fullRoute, v.lat, v.lng);
+            L.polyline(split.passed, { color: '#065f46', weight: 6, opacity: 0.4 }).addTo(this.routeLineGroup);
+            L.polyline(split.passed, { color: '#10b981', weight: 3.5, opacity: 0.95 }).addTo(this.routeLineGroup);
+            L.polyline(split.remaining, { color: job.isCrossBorder ? '#5b21b6' : '#1e40af', weight: 5, opacity: 0.35 }).addTo(this.routeLineGroup);
+            L.polyline(split.remaining, { color: job.isCrossBorder ? '#8b5cf6' : '#2563eb', weight: 3.5, opacity: 0.95, dashArray: '6, 5' }).addTo(this.routeLineGroup);
+          } else {
+            L.polyline(fullRoute, { color: '#2563eb', weight: 3.5, opacity: 0.85, dashArray: '6, 5' }).addTo(this.routeLineGroup);
+          }
+        }
+
+        const group = new L.featureGroup(groupPoints);
         this.map.fitBounds(group.getBounds(), { padding: [30, 30] });
 
         // Timeline

@@ -2422,13 +2422,26 @@ const App = {
 
     if (jobActions) {
       jobActions.classList.remove("hidden");
+      const gMapsUrl = (pLoc && dLoc && window.HighwayRouting)
+        ? window.HighwayRouting.getGoogleMapsDirectionsUrl([pLoc.lat, pLoc.lng], [dLoc.lat, dLoc.lng], (v.status === "running" || v.status === "resting") ? [v.lat, v.lng] : null)
+        : null;
+
       jobActions.innerHTML = `
-        <button type="button" onclick="App.openMilestonesModal('${job.id}')" class="flex-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl text-[11px] font-bold transition text-center">
-          🕒 ดูแผนเวลา / จุดพักรถ
-        </button>
-        <button type="button" onclick="App.openJobFromVehicleDetail('${job.id}')" class="flex-1 px-3 py-1.5 bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white border border-blue-200 rounded-xl text-[11px] font-bold transition text-center">
-          เปิดหน้าติดตามสถานะงาน &rarr;
-        </button>
+        <div class="flex items-center gap-2 w-full">
+          <button type="button" onclick="App.openMilestonesModal('${job.id}')" class="flex-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl text-[11px] font-bold transition text-center">
+            🕒 ดูแผนเวลา / จุดพักรถ
+          </button>
+          <button type="button" onclick="App.openJobFromVehicleDetail('${job.id}')" class="flex-1 px-3 py-1.5 bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white border border-blue-200 rounded-xl text-[11px] font-bold transition text-center">
+            เปิดหน้าติดตามสถานะงาน &rarr;
+          </button>
+        </div>
+        ${gMapsUrl ? `
+        <a href="${gMapsUrl}" target="_blank" rel="noopener noreferrer" class="w-full px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold transition text-center flex items-center justify-center gap-2 shadow-sm">
+          <svg class="w-4 h-4 text-white shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+          <span>🗺️ เปิดดูเส้นทางจริงบน Google Maps</span>
+          <svg class="w-3.5 h-3.5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+        </a>
+        ` : ''}
       `;
     }
 

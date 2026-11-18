@@ -295,56 +295,110 @@ class MapManager {
 
       boundsPoints.push([pLoc.lat, pLoc.lng], [dLoc.lat, dLoc.lng]);
 
-      const isEnRoute = job.currentStatusId >= 5 && !(window.store && window.store.isJobCompleted(job));
-      const remColor = job.isCrossBorder ? "#7c3aed" : "#2563eb";
+    // Query real-world highway waypoints (following ทล.7, ทล.9, ทล.1, ทล.2 มิตรภาพ, etc.)
+    const fullRoute = window.HighwayRouting
+      ? window.HighwayRouting.getHighwayRoute(pLoc.id, dLoc.id, [pLoc.lat, pLoc.lng], [dLoc.lat, dLoc.lng])
+      : [[pLoc.lat, pLoc.lng], [dLoc.lat, dLoc.lng]];
 
-      if (isEnRoute) {
-        // Solid emerald line: Pickup -> Current vehicle position
-        const doneLine = L.polyline([[pLoc.lat, pLoc.lng], [vehicle.lat, vehicle.lng]], {
-          color: "#10b981",
-          weight: 5,
-          opacity: 0.9
-        }).addTo(this.map);
+    fullRoute.forEach(pt => boundsPoints.push(pt));
 
-        // Dashed route line: Current vehicle position -> Dropoff
-        const remLine = L.polyline([[vehicle.lat, vehicle.lng], [dLoc.lat, dLoc.lng]], {
-          color: remColor,
-          weight: 4,
-          opacity: 0.9,
-          dashArray: "8, 6"
-        }).addTo(this.map);
+    const isEnRoute = job.currentStatusId >= 5 && !(window.store && window.store.isJobCompleted(job));
+    const isCrossBorder = !!job.isCrossBorder;
+    const remColor = isCrossBorder ? "#8b5cf6" : "#2563eb";
+    const remBgColor = isCrossBorder ? "#5b21b6" : "#1e40af";
 
-        this._singleDoneLine = doneLine;
-        this._singleRemLine = remLine;
-        this.routeLines.push(doneLine, remLine);
-      } else {
-        // Planned route line: Pickup -> Dropoff
-        const planLine = L.polyline([[pLoc.lat, pLoc.lng], [dLoc.lat, dLoc.lng]], {
-          color: remColor,
-          weight: 4,
-          opacity: 0.85,
-          dashArray: "6, 6"
-        }).addTo(this.map);
-        this.routeLines.push(planLine);
-      }
+    if (isEnRoute) {
+      const split = window.HighwayRouting
+        ? window.HighwayRouting.splitHighwayRouteAtVehicle(fullRoute, vehicle.lat, vehicle.lng)
+        : { passed: [[pLoc.lat, pLoc.lng], [vehicle.lat, vehicle.lng]], remaining: [[vehicle.lat, vehicle.lng], [dLoc.lat, dLoc.lng]] };
 
-      this.map.fitBounds(boundsPoints, { padding: [50, 50], maxZoom: 12 });
+      // 1. Google Maps styled casing for completed highway route (Dark Emerald underlay + Bright Emerald inner)
+      const doneBg = L.polyline(split.passed, {
+        color: "#065f46",
+        weight: 8,
+        opacity: 0.5,
+        lineCap: "round",
+        lineJoin: "round"
+      }).addTo(this.map);
+
+      const doneLine = L.polyline(split.passed, {
+        color: "#10b981",
+        weight: 5,
+        opacity: 0.95,
+        lineCap: "round",
+        lineJoin: "round"
+      }).addTo(this.map);
+
+      // 2. Google Maps styled casing for remaining highway route (Dark Navy/Purple underlay + Bright Blue/Violet dashed)
+      const remBg = L.polyline(split.remaining, {
+        color: remBgColor,
+        weight: 7,
+        opacity: 0.4,
+        lineCap: "round",
+        lineJoin: "round"
+      }).addTo(this.map);
+
+      const remLine = L.polyline(split.remaining, {
+        color: remColor,
+        weight: 4.5,
+        opacity: 0.95,
+        dashArray: "8, 6",
+        lineCap: "round",
+        lineJoin: "round"
+      }).addTo(this.map);
+
+      this._singleDoneBg = doneBg;
+      this._singleDoneLine = doneLine;
+      this._singleRemBg = remBg;
+      this._singleRemLine = remLine;
+      this.routeLines.push(doneBg, doneLine, remBg, remLine);
     } else {
-      this.map.setView([vehicle.lat, vehicle.lng], 12);
-    }
-  }
+      // Planned route along highway before dispatch
+      const planBg = L.polyline(fullRoute, {
+        color: remBgColor,
+        weight: 7,
+        opacity: 0.35,
+        lineCap: "round",
+        lineJoin: "round"
+      }).addTo(this.map);
 
-  /**
-   * Smoothly update marker & route trajectory on live GPS ticks without resetting user zoom
-   */
-  updateSingleVehicleFocusPosition(vehicle, job, pLoc, dLoc) {
-    if (!this.map || !vehicle) return;
-    const vMarker = this.markers[vehicle.id];
-    if (vMarker) {
-      vMarker.setLatLng([vehicle.lat, vehicle.lng]);
-      vMarker.setPopupContent(`<div class="text-xs font-bold text-slate-800">${vehicle.plate} (${vehicle.brand} ${vehicle.model})</div><div class="text-[11px] text-blue-600">ความเร็ว: ${vehicle.speed} กม./ชม.</div>`);
+      const planLine = L.polyline(fullRoute, {
+        color: remColor,
+        weight: 4.5,
+        opacity: 0.9,
+        dashArray: "7, 5",
+        lineCap: "round",
+        lineJoin: "round"
+      }).addTo(this.map);
+
+      this.routeLines.push(planBg, planLine);
     }
-    if (job && pLoc && dLoc) {
+
+    this.map.fitBounds(boundsPoints, { padding: [45, 45], maxZoom: 12 });
+  } else {
+    this.map.setView([vehicle.lat, vehicle.lng], 12);
+  }
+}
+
+/**
+ * Smoothly update marker & route trajectory on live GPS ticks without resetting user zoom
+ */
+updateSingleVehicleFocusPosition(vehicle, job, pLoc, dLoc) {
+  if (!this.map || !vehicle) return;
+  const vMarker = this.markers[vehicle.id];
+  if (vMarker) {
+    vMarker.setLatLng([vehicle.lat, vehicle.lng]);
+    vMarker.setPopupContent(`<div class="text-xs font-bold text-slate-800">${vehicle.plate} (${vehicle.brand} ${vehicle.model})</div><div class="text-[11px] text-blue-600">ความเร็ว: ${vehicle.speed} กม./ชม.</div>`);
+  }
+  if (job && pLoc && dLoc) {
+    if (window.HighwayRouting) {
+      const fullRoute = window.HighwayRouting.getHighwayRoute(pLoc.id, dLoc.id, [pLoc.lat, pLoc.lng], [dLoc.lat, dLoc.lng]);
+      const split = window.HighwayRouting.splitHighwayRouteAtVehicle(fullRoute, vehicle.lat, vehicle.lng);
+      if (this._singleDoneBg) this._singleDoneBg.setLatLngs(split.passed);
+      if (this._singleDoneLine) this._singleDoneLine.setLatLngs(split.passed);
+      if (this._singleRemBg) this._singleRemBg.setLatLngs(split.remaining);
+      if (this._singleRemLine) this._singleRemLine.setLatLngs(split.remaining);
+    } else {
       if (this._singleDoneLine) {
         this._singleDoneLine.setLatLngs([[pLoc.lat, pLoc.lng], [vehicle.lat, vehicle.lng]]);
       }
@@ -352,6 +406,7 @@ class MapManager {
         this._singleRemLine.setLatLngs([[vehicle.lat, vehicle.lng], [dLoc.lat, dLoc.lng]]);
       }
     }
+  }
   }
 
   focusVehicle(vehicleId) {
@@ -371,21 +426,33 @@ class MapManager {
       this.map.removeLayer(this.routePolyline);
     }
 
-    // Midpoint curve simulation
-    const midLat = (startLat + endLat) / 2 + 0.05;
-    const midLng = (startLng + endLng) / 2 - 0.05;
+    let latlngs = null;
+    if (window.HighwayRouting && window.store) {
+      const locs = window.store.getLocations();
+      const startLoc = locs.find(l => Math.abs(l.lat - startLat) < 0.05 && Math.abs(l.lng - startLng) < 0.05);
+      const endLoc = locs.find(l => Math.abs(l.lat - endLat) < 0.05 && Math.abs(l.lng - endLng) < 0.05);
+      if (startLoc && endLoc) {
+        latlngs = window.HighwayRouting.getHighwayRoute(startLoc.id, endLoc.id, [startLat, startLng], [endLat, endLng]);
+      }
+    }
 
-    const latlngs = [
-      [startLat, startLng],
-      [midLat, midLng],
-      [endLat, endLng]
-    ];
+    if (!latlngs || latlngs.length < 2) {
+      const midLat = (startLat + endLat) / 2 + 0.05;
+      const midLng = (startLng + endLng) / 2 - 0.05;
+      latlngs = [
+        [startLat, startLng],
+        [midLat, midLng],
+        [endLat, endLng]
+      ];
+    }
 
     this.routePolyline = L.polyline(latlngs, {
       color: color,
       weight: 5,
-      opacity: 0.8,
-      dashArray: "8, 6"
+      opacity: 0.85,
+      dashArray: "8, 6",
+      lineCap: "round",
+      lineJoin: "round"
     }).addTo(this.map);
 
     this.map.fitBounds(this.routePolyline.getBounds(), { padding: [40, 40] });
