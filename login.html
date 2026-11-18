@@ -201,86 +201,6 @@
       background: #e2e8f0;
       color: #334155;
     }
-    .quick-section {
-      border-top: 1px solid #f1f5f9;
-      padding-top: 0.75rem;
-    }
-    .quick-title {
-      font-size: 0.6875rem;
-      font-weight: 700;
-      color: #64748b;
-      margin-bottom: 0.5rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .quick-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.5rem;
-    }
-    .quick-btn {
-      padding: 0.5rem 0.6rem;
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 0.75rem;
-      text-align: left;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      transition: all 0.2s ease;
-    }
-    .quick-btn:hover {
-      background: #f1f5f9;
-      border-color: #93c5fd;
-    }
-    .avatar-badge {
-      width: 26px;
-      height: 26px;
-      border-radius: 0.5rem;
-      color: #ffffff;
-      font-size: 0.625rem;
-      font-weight: 800;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-    .quick-btn-info {
-      overflow: hidden;
-      white-space: nowrap;
-    }
-    .quick-btn-name {
-      font-size: 0.6875rem;
-      font-weight: 700;
-      color: #1e293b;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .quick-btn-sub {
-      font-size: 0.625rem;
-      color: #64748b;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .driver-dropdown {
-      margin-top: 0.5rem;
-      width: 100%;
-      padding: 0.5rem 0.65rem;
-      border-radius: 0.75rem;
-      border: 1px solid #e2e8f0;
-      background: #f8fafc;
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: #334155;
-      outline: none;
-      cursor: pointer;
-    }
-    .driver-dropdown:focus {
-      border-color: #2563eb;
-      background: #ffffff;
-    }
     .customer-card {
       padding: 0.75rem 0.85rem;
       background: #fffbeb;
@@ -410,66 +330,6 @@
         </button>
       </form>
 
-      <!-- Quick Demo Login Section -->
-      <div class="quick-section">
-        <div class="quick-title">
-          <span>⚡ บัญชีทดสอบด่วน (คลิกเข้าใช้งานได้ทันที):</span>
-        </div>
-        <div class="quick-grid">
-          <!-- Admin 1 -->
-          <button type="button" onclick="Auth.quickLogin('admin')" class="quick-btn">
-            <span class="avatar-badge" style="background: #2563eb;">AD</span>
-            <div class="quick-btn-info">
-              <div class="quick-btn-name">Admin ศูนย์ควบคุม</div>
-              <div class="quick-btn-sub">ระบบติดตามฟลีท</div>
-            </div>
-          </button>
-          <!-- Admin 2 / NWT -->
-          <button type="button" onclick="Auth.quickLogin('NEXTROUTE')" class="quick-btn">
-            <span class="avatar-badge" style="background: #059669;">NR</span>
-            <div class="quick-btn-info">
-              <div class="quick-btn-name">NEXTROUTE (NWT)</div>
-              <div class="quick-btn-sub">ผู้ดูแลระบบกองรถ</div>
-            </div>
-          </button>
-          <!-- Driver D-07 -->
-          <button type="button" onclick="Auth.quickLogin('D-07')" class="quick-btn">
-            <span class="avatar-badge" style="background: #16a34a;">ST</span>
-            <div class="quick-btn-info">
-              <div class="quick-btn-name">คนขับ D-07 (สุเทพ)</div>
-              <div class="quick-btn-sub">คัน ชบ.74-0549</div>
-            </div>
-          </button>
-          <!-- Driver D-14 -->
-          <button type="button" onclick="Auth.quickLogin('D-14')" class="quick-btn">
-            <span class="avatar-badge" style="background: #7c3aed;">CR</span>
-            <div class="quick-btn-info">
-              <div class="quick-btn-name">คนขับ D-14 (จิรพัฒน์)</div>
-              <div class="quick-btn-sub">คัน ชบ.74-1750</div>
-            </div>
-          </button>
-        </div>
-
-        <!-- Dropdown to login as ANY of the 14 Drivers -->
-        <select id="driver-quick-select" class="driver-dropdown" onchange="handleDriverSelect(this)">
-          <option value="">🎯 เลือกล็อกอินคนขับท่านอื่นๆ (D-01 ถึง D-14)...</option>
-          <option value="D-01">D-01: นายประสิทธิ์ น้ำนาค (ชบ.73-8910 Volvo FM11)</option>
-          <option value="D-02">D-02: นายรัญญา พงษ์วัน (ชบ.73-8912 Volvo FM11)</option>
-          <option value="D-03">D-03: นายจินดา พิชวนชม (ชบ.73-8914 Volvo FM11)</option>
-          <option value="D-04">D-04: นายกิตถโรจน์ ปัญญาธิป (ชบ.73-8947 Volvo FM11)</option>
-          <option value="D-05">D-05: นายอนงค์ ผิวคำ (ชบ.73-8949 Volvo FM11)</option>
-          <option value="D-06">D-06: นายชำนาญ จุลวรรณ (ชบ.74-0547 Scania P360)</option>
-          <option value="D-07">D-07: นายสุเทพ โพธิ์ศรี (ชบ.74-0549 Scania P360)</option>
-          <option value="D-08">D-08: นายธวัชชัย อุเทศ (ชบ.74-0551 Scania P360)</option>
-          <option value="D-09">D-09: นายสมคิด แสงสร้อย (ชบ.74-0553 Scania P360)</option>
-          <option value="D-10">D-10: สำรอง NRL (ชบ.74-0553 Scania P360)</option>
-          <option value="D-11">D-11: นายน้อม กะปรัม (ชบ.74-0556 ข้ามแดน Scania P360)</option>
-          <option value="D-12">D-12: นายประทีป อินทาโนะ (ชบ.74-1586 Scania P360)</option>
-          <option value="D-13">D-13: นายอานนท์ อุ่นกะสัง (ชบ.74-1748 Scania P360)</option>
-          <option value="D-14">D-14: นายจิรพัฒน์ สงนอก (ชบ.74-1750 Scania P360)</option>
-        </select>
-      </div>
-
       <!-- Public Customer Tracking Card (No Login Required) -->
       <div class="customer-card">
         <div>
@@ -508,12 +368,6 @@
       } else {
         showError(res.message);
       }
-    }
-
-    function handleDriverSelect(selectEl) {
-      const val = selectEl.value;
-      if (!val) return;
-      Auth.quickLogin(val);
     }
 
     function showError(msg) {
