@@ -186,6 +186,52 @@ const DEFAULT_DATA = {
   // รายการใบงานขนส่งจริง (Jobs) เชื่อมต่อกองรถจริง 14 คัน
   jobs: [
     {
+      id: "JN-000",
+      code: "JN-2026-C01",
+      customerId: "CUS-005", // บจก. ลาว ปิโตรเลียม เทรดดิ้ง (ส่งออก สปป.ลาว)
+      isCrossBorder: true,
+      transportType: "cross_border",
+      productType: "ก๊าซ LPG ข้ามแดน",
+      productQty: "18 ตัน",
+      pickupLocId: "LOC-002",
+      dropoffLocId: "LOC-007", // ด่านสะพานมิตรภาพไทย-ลาว (หนองคาย)
+      vehicleId: "V-11", // ชบ.74-0556 (นายน้อม กะปรัม)
+      driverId: "D-11",
+      departureDate: "2026-11-16",
+      departureTime: "06:00",
+      estimatedDurationHours: 5.5,
+      eta: "2026-11-16 11:30",
+      currentStatusId: 8, // เสร็จสมบูรณ์ / กลับถึงศูนย์ (completed)
+      currentStatusKey: "completed",
+      routeDistanceKm: 245,
+      returnToCompany: true,
+      hasRestStop: true,
+      restCount: 1,
+      restDurationMinutes: 30,
+      customsPermitNo: "CB-THLA-2026/0488",
+      customsDeclarationNo: "กศก.120-690180",
+      customsCheckpoint: "ด่านศุลกากรสะพานมิตรภาพไทย-ลาว (หนองคาย)",
+      destinationCountry: "สาธารณรัฐประชาธิปไตยประชาชนลาว (Lao PDR)",
+      driverPassport: "PASSPORT-TH-AA99218 (ท.4 สากล)",
+      customsSealNo: "SEAL-CUSTOMS-8790",
+      documentsChecklist: [
+        { name: "ใบอนุญาตขนส่งสินค้าอันตรายข้ามแดน (Cross-Border DG Permit)", status: "approved", docNo: "CB-THLA-2026/0488" },
+        { name: "ใบขนสินค้าขาออก กศก.120 พร้อมชำระภาษี", status: "approved", docNo: "กศก.120-690180" },
+        { name: "หนังสือเดินทางคนขับ (Passport) & ใบขับขี่ ท.4", status: "verified", docNo: "PASSPORT-TH-AA99218" },
+        { name: "ซีลล็อกวาล์วถังก๊าซศุลกากร (Customs Tamper Seal)", status: "inspected", docNo: "SEAL-CUSTOMS-8790" }
+      ],
+      timeline: [
+        { statusId: 1, name: "รอรับงาน", time: "05:00", note: "สร้างงานส่งออกก๊าซ LPG ข้ามแดน สปป.ลาว", by: "Admin Dispatcher" },
+        { statusId: 2, name: "ลงคิวคนขับ", time: "05:15", note: "มอบหมาย ชบ.74-0556 (นายน้อม กะปรัม)", by: "Admin Dispatcher" },
+        { statusId: 3, name: "ตรวจสภาพรถ", time: "05:40", note: "ตรวจเช็กสภาพหัวลากและวาล์วถังก๊าซ ผ่าน", by: "นายน้อม กะปรัม" },
+        { statusId: 4, name: "รับสินค้า", time: "06:30", note: "โหลดก๊าซ LPG 18 ตัน ปิดซีลศุลกากร", by: "โรงกลั่นไทยออยล์" },
+        { statusId: 5, name: "ด่านศุลกากร", time: "09:30", note: "ผ่านพิธีการศุลกากรด่านหนองคาย ตรวจซีลเรียบร้อย", by: "เจ้าหน้าที่ศุลกากร" },
+        { statusId: 6, name: "ออกเดินทาง", time: "10:00", note: "ข้ามสะพานมิตรภาพสู่ฝั่งเวียงจันทน์", by: "นายน้อม กะปรัม" },
+        { statusId: 7, name: "ส่งมอบสินค้า", time: "11:30", note: "ถ่ายเทก๊าซเข้าคลังปลายทาง ลูกค้าลงนาม e-POD สำเร็จ", by: "บจก. ลาว ปิโตรเลียม เทรดดิ้ง" },
+        { statusId: 8, name: "เสร็จสมบูรณ์", time: "14:00", note: "ตีรถกลับถึงศูนย์ชลบุรี ตรวจสอบมิเตอร์และส่งเอกสารครบถ้วน", by: "Admin Dispatcher" }
+      ]
+    },
+    {
       id: "JN-001",
       code: "JN-2026-001",
       customerId: "CUS-001",

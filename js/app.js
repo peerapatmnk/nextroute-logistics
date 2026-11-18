@@ -10,6 +10,8 @@ const App = {
   editingVehicleId: null,
   _lastDetailStepKey: null,
   mapManagers: {},
+  gpsStatusFilter: "all",
+  gpsSearchQuery: "",
 
   VEHICLE_STATUS_MAP: {
     running: { cls: "bg-emerald-100 text-emerald-700 border border-emerald-200", label: "กำลังวิ่งส่งสินค้า", dot: "bg-emerald-500" },
@@ -433,32 +435,33 @@ const App = {
     const stepperContainer = document.getElementById("fsm-stepper-container");
     if (stepperContainer) {
       const activeIdx = job.currentStatusId;
-      const progressPercent = Math.min(100, Math.max(0, ((activeIdx - 1) / (flow.length - 1)) * 100));
-
       const lineActive = stepperContainer.querySelector(".stepper-line-active");
-      if (lineActive) {
-        lineActive.style.width = `calc(${progressPercent}% * 0.92)`;
-      }
+      if (lineActive) lineActive.style.display = "none";
+      const lineBase = stepperContainer.querySelector(".stepper-line");
+      if (lineBase) lineBase.style.display = "none";
 
       const nodesContainer = document.getElementById("stepper-nodes-wrapper");
       if (nodesContainer) {
-        nodesContainer.innerHTML = flow.map(step => {
+        nodesContainer.innerHTML = flow.map((step, idx) => {
           const isCompleted = step.id < activeIdx;
           const isActive = step.id === activeIdx;
-          const stateClass = isCompleted ? "completed" : isActive ? "active" : "";
+          const isLineActive = step.id <= activeIdx;
 
           return `
-            <div class="stepper-node ${stateClass} cursor-default select-none" title="${step.name}: ${step.desc}">
-              <div class="stepper-circle">
+            <div class="flex-1 flex flex-col items-center relative cursor-default select-none" title="${step.name}: ${step.desc}">
+              ${idx > 0 ? `
+                <div class="absolute top-6 right-1/2 w-full h-1 -translate-y-1/2 z-0 ${isLineActive ? 'bg-emerald-500' : 'bg-slate-200'}"></div>
+              ` : ''}
+              <div class="stepper-circle relative z-10 ${isCompleted ? 'bg-emerald-500 text-white border-emerald-600' : isActive ? (step.key === 'border_customs' ? 'bg-purple-600 text-white border-purple-600 ring-4 ring-purple-100' : 'bg-blue-600 text-white border-blue-600 ring-4 ring-blue-100') : 'bg-white text-slate-400 border-slate-300'}">
                 ${isCompleted ? `
                   <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                 ` : step.id}
               </div>
-              <div class="mt-2 text-center">
+              <div class="mt-2 text-center px-1">
                 <div class="text-xs font-bold ${isActive ? (step.key === 'border_customs' ? 'text-purple-600' : 'text-blue-600') : isCompleted ? 'text-emerald-700' : 'text-slate-500'}">
                   ${step.name}
                 </div>
-                <div class="text-[10px] text-slate-400 hidden sm:block max-w-[85px] leading-tight mt-0.5">${step.desc}</div>
+                <div class="text-[10px] text-slate-400 hidden sm:block max-w-[90px] leading-tight mt-0.5">${step.desc}</div>
               </div>
             </div>
           `;
@@ -925,9 +928,9 @@ const App = {
       body.innerHTML = `
         <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2">
           <div class="flex justify-between"><span>รหัสงาน:</span> <strong class="font-mono text-slate-800">${job.id} (${job.code})</strong></div>
-          <div class="flex justify-between"><span>ด่านศุลกากรข้ามแดน:</span> <strong class="text-slate-800">${job.customsCheckpoint || "ด่านศุลกากรอรัญประเทศ"}</strong></div>
-          <div class="flex justify-between"><span>ประเทศปลายทาง:</span> <strong class="text-purple-700 font-bold">${job.destinationCountry || "กัมพูชา"}</strong></div>
-          <div class="flex justify-between"><span>เลขที่ใบอนุญาต:</span> <strong class="font-mono text-blue-700">${job.customsPermitNo || "CB-THKH-2026/0491"}</strong></div>
+          <div class="flex justify-between"><span>ด่านศุลกากรข้ามแดน:</span> <strong class="text-slate-800">${job.customsCheckpoint || "ด่านศุลกากรสะพานมิตรภาพไทย-ลาว (หนองคาย)"}</strong></div>
+          <div class="flex justify-between"><span>ประเทศปลายทาง:</span> <strong class="text-purple-700 font-bold">${job.destinationCountry || "สาธารณรัฐประชาธิปไตยประชาชนลาว (Lao PDR)"}</strong></div>
+          <div class="flex justify-between"><span>เลขที่ใบอนุญาต:</span> <strong class="font-mono text-blue-700">${job.customsPermitNo || "CB-THLA-2026/0491"}</strong></div>
           <div class="flex justify-between"><span>เลขที่ใบขน กศก.120:</span> <strong class="font-mono text-emerald-700">${job.customsDeclarationNo || "กศก.120-690214"}</strong></div>
         </div>
         <div class="font-bold text-slate-800 mt-2">รายการตรวจสอบเอกสารประจำรถข้ามแดน (Clearance Checklist):</div>
@@ -1161,10 +1164,35 @@ const App = {
   /* =====================================================================
      3. GPS Tracking Render (ผสานการคำนวณระยะทางคงเหลือและ Live ETA)
   ===================================================================== */
+  filterGpsStatus(status = "all") {
+    this.gpsStatusFilter = status;
+    this.renderGpsTracking();
+  },
+
+  filterGpsSearch(query = "") {
+    this.gpsSearchQuery = (query || "").trim().toLowerCase();
+    this.renderGpsTracking();
+  },
+
   renderGpsTracking() {
     if (this.mapManagers.gps && this.mapManagers.gps.map) {
       this.mapManagers.gps.map.invalidateSize();
-      this.mapManagers.gps.renderVehicles();
+      this.mapManagers.gps.renderVehicles(this.gpsStatusFilter);
+    }
+
+    // Update filter buttons styling
+    const btnAll = document.getElementById("gps-btn-filter-all");
+    const btnRunning = document.getElementById("gps-btn-filter-running");
+    const btnResting = document.getElementById("gps-btn-filter-resting");
+    if (btnAll && btnRunning && btnResting) {
+      const activeCls = "px-2.5 py-1 text-xs font-bold rounded-lg transition bg-blue-600 text-white shadow-sm";
+      const inactiveAllCls = "px-2.5 py-1 text-xs font-bold rounded-lg transition bg-slate-100 text-slate-700 hover:bg-slate-200";
+      const inactiveRunningCls = "px-2.5 py-1 text-xs font-bold rounded-lg transition bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-800";
+      const inactiveRestingCls = "px-2.5 py-1 text-xs font-bold rounded-lg transition bg-slate-100 text-slate-700 hover:bg-amber-50 hover:text-amber-800";
+
+      btnAll.className = (this.gpsStatusFilter === "all") ? activeCls : inactiveAllCls;
+      btnRunning.className = (this.gpsStatusFilter === "running") ? activeCls : inactiveRunningCls;
+      btnResting.className = (this.gpsStatusFilter === "resting") ? activeCls : inactiveRestingCls;
     }
 
     const vehicles = window.store.getVehicles();
@@ -1172,7 +1200,37 @@ const App = {
     const listContainer = document.getElementById("gps-vehicle-list");
     if (!listContainer) return;
 
-    listContainer.innerHTML = vehicles.map(v => {
+    let filteredVehicles = vehicles;
+    if (this.gpsStatusFilter && this.gpsStatusFilter !== "all") {
+      filteredVehicles = filteredVehicles.filter(v => v.status === this.gpsStatusFilter);
+    }
+    if (this.gpsSearchQuery) {
+      filteredVehicles = filteredVehicles.filter(v => {
+        const driver = window.store.getDriver(v.driverId) || { name: "" };
+        const currentJob = jobs.find(j => j.vehicleId === v.id && !window.store.isJobCompleted(j));
+        const hay = [v.plate, v.brand, v.model, driver.name, currentJob?.code, currentJob?.id].filter(Boolean).join(" ").toLowerCase();
+        return hay.includes(this.gpsSearchQuery);
+      });
+    }
+
+    const countLabel = document.getElementById("gps-vehicles-count-label");
+    if (countLabel) {
+      countLabel.textContent = (filteredVehicles.length === vehicles.length)
+        ? vehicles.length
+        : `${filteredVehicles.length}/${vehicles.length}`;
+    }
+
+    if (filteredVehicles.length === 0) {
+      listContainer.innerHTML = `
+        <div class="p-6 text-center text-xs text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200 mt-2">
+          <span class="text-xl block mb-1">🔍</span>
+          ไม่พบรถขนส่งที่ตรงตามเงื่อนไขค้นหา
+        </div>
+      `;
+      return;
+    }
+
+    listContainer.innerHTML = filteredVehicles.map(v => {
       const driver = window.store.getDriver(v.driverId) || { name: "-" };
       const currentJob = jobs.find(j => j.vehicleId === v.id && !window.store.isJobCompleted(j));
       const dropoffLoc = currentJob ? window.store.getLocation(currentJob.dropoffLocId) : null;
@@ -2444,8 +2502,9 @@ const App = {
 
     const filteredRows = allCompleted.filter(r => {
       const j = r.job;
-      if (typeFilter === "domestic" && j.isCrossBorder) return false;
-      if (typeFilter === "cross_border" && !j.isCrossBorder) return false;
+      const isCb = Boolean(j.isCrossBorder || j.transportType === "cross_border");
+      if (typeFilter === "domestic" && isCb) return false;
+      if (typeFilter === "cross_border" && !isCb) return false;
       if (!query) return true;
 
       const haystacks = [
@@ -2559,35 +2618,36 @@ const App = {
       const j = r.job;
       return `
         <tr class="hover:bg-slate-50 border-b border-slate-100 text-xs">
-          <td class="py-3 px-4 font-mono font-bold text-blue-700 align-top">
-            <div>${j.id}</div>
+          <td class="py-2.5 px-3 font-mono font-bold text-blue-700 align-top">
+            <div>${j.code || j.id}</div>
+            <div class="text-[10px] text-slate-400 font-mono">${j.id}</div>
             ${j.isCrossBorder
               ? '<span class="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] bg-purple-100 text-purple-700 font-sans font-bold border border-purple-200">🌐 ข้ามแดน</span>'
               : '<span class="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] bg-slate-100 text-slate-600 font-sans font-semibold">ในประเทศ</span>'}
           </td>
-          <td class="py-3 px-4 align-top">
+          <td class="py-2.5 px-3 align-top">
             <div class="text-slate-700 font-medium font-mono">${j.departureDate || "-"}</div>
             <span class="inline-block mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
               ✓ เสร็จสิ้น ${r.completedTime}
             </span>
           </td>
-          <td class="py-3 px-4 font-medium text-slate-800 align-top">${r.cust.name}</td>
-          <td class="py-3 px-4 text-slate-600 align-top">
+          <td class="py-2.5 px-3 font-medium text-slate-800 align-top">${r.cust.name}</td>
+          <td class="py-2.5 px-3 text-slate-600 align-top">
             <div class="font-medium text-slate-800">${r.pLoc.province || "-"} &rarr; ${r.dLoc.province || "-"}</div>
-            <div class="text-[11px] text-slate-400 truncate max-w-[230px]" title="${r.pLoc.name} -> ${r.dLoc.name}">${r.pLoc.name} &rarr; ${r.dLoc.name}</div>
+            <div class="text-[11px] text-slate-400 truncate max-w-[200px]" title="${r.pLoc.name} -> ${r.dLoc.name}">${r.pLoc.name} &rarr; ${r.dLoc.name}</div>
           </td>
-          <td class="py-3 px-4 align-top">
+          <td class="py-2.5 px-3 align-top">
             <div class="font-semibold text-indigo-700">${j.productType || "-"}</div>
             <div class="text-[11px] text-slate-500">${j.productQty || "-"}</div>
           </td>
-          <td class="py-3 px-4 text-right font-mono font-bold text-slate-800 align-top">
+          <td class="py-2.5 px-3 text-right font-mono font-bold text-slate-800 align-top">
             ${j.routeDistanceKm ? `${j.routeDistanceKm} กม.` : "-"}
           </td>
-          <td class="py-3 px-4 align-top">
+          <td class="py-2.5 px-3 align-top">
             <div class="font-mono font-bold text-slate-800">${r.v.plate}</div>
             <div class="text-[11px] text-slate-500">${r.d.name}</div>
           </td>
-          <td class="py-3 px-4 text-right align-top whitespace-nowrap">
+          <td class="py-2.5 px-3 text-right align-top whitespace-nowrap">
             <button type="button" onclick="App.openJobInTracker('${j.id}')" class="text-blue-600 hover:underline font-semibold">
               ดูไทม์ไลน์ &rarr;
             </button>

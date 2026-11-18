@@ -45,18 +45,35 @@ class AppStore {
           parsed.isRealNwtFleet = true;
           localStorage.setItem(this.STORAGE_KEY, JSON.stringify(parsed));
         }
-        // Ensure JN-005 has isCrossBorder
-        const defaultJN005 = window.DEFAULT_DATA?.jobs?.find(j => j.id === "JN-005");
-        const storedJN005 = parsed.jobs?.find(j => j.id === "JN-005");
-        if (storedJN005 && defaultJN005 && !storedJN005.isCrossBorder) {
-          Object.assign(storedJN005, defaultJN005);
+        // Sync customers with latest data (e.g. CUS-005 Laos Petroleum)
+        if (window.DEFAULT_DATA?.customers && parsed.customers) {
+          window.DEFAULT_DATA.customers.forEach(defCus => {
+            const idx = parsed.customers.findIndex(c => c.id === defCus.id);
+            if (idx >= 0) {
+              parsed.customers[idx] = JSON.parse(JSON.stringify(defCus));
+            } else {
+              parsed.customers.push(JSON.parse(JSON.stringify(defCus)));
+            }
+          });
         }
 
-        // Backfill sample photos into timeline for seed jobs if not already present
+        // Ensure JN-005 has isCrossBorder and latest details
+        const defaultJN005 = window.DEFAULT_DATA?.jobs?.find(j => j.id === "JN-005");
+        const storedJN005 = parsed.jobs?.find(j => j.id === "JN-005");
+        if (storedJN005 && defaultJN005) {
+          storedJN005.isCrossBorder = true;
+          storedJN005.customsCheckpoint = defaultJN005.customsCheckpoint;
+          storedJN005.destinationCountry = defaultJN005.destinationCountry;
+          storedJN005.customerId = defaultJN005.customerId;
+        }
+
+        // Backfill sample photos & seed jobs into store if not already present
         if (window.DEFAULT_DATA?.jobs && parsed.jobs) {
           window.DEFAULT_DATA.jobs.forEach(defJob => {
             const storedJob = parsed.jobs.find(j => j.id === defJob.id);
-            if (storedJob && storedJob.timeline && defJob.timeline) {
+            if (!storedJob) {
+              parsed.jobs.push(JSON.parse(JSON.stringify(defJob)));
+            } else if (storedJob && storedJob.timeline && defJob.timeline) {
               defJob.timeline.forEach(defStep => {
                 if (defStep.photos && defStep.photos.length > 0) {
                   const storedStep = storedJob.timeline.find(s => s.statusId === defStep.statusId);
@@ -391,10 +408,10 @@ class AppStore {
     };
 
     if (isCrossBorder) {
-      newJob.customsPermitNo = jobData.customsPermitNo || `CB-THKH-2026/${String(Math.floor(Math.random() * 9000) + 1000)}`;
+      newJob.customsPermitNo = jobData.customsPermitNo || `CB-THLA-2026/${String(Math.floor(Math.random() * 9000) + 1000)}`;
       newJob.customsDeclarationNo = jobData.customsDeclarationNo || `กศก.120-${String(Math.floor(Math.random() * 900000) + 100000)}`;
-      newJob.customsCheckpoint = "ด่านศุลกากรอรัญประเทศ (สะพานมิตรภาพไทย-กัมพูชา)";
-      newJob.destinationCountry = "ราชอาณาจักรกัมพูชา";
+      newJob.customsCheckpoint = jobData.customsCheckpoint || "ด่านศุลกากรสะพานมิตรภาพไทย-ลาว (หนองคาย)";
+      newJob.destinationCountry = jobData.destinationCountry || "สาธารณรัฐประชาธิปไตยประชาชนลาว (Lao PDR)";
       newJob.documentsChecklist = [
         { name: "ใบอนุญาตขนส่งสินค้าอันตรายข้ามแดน (Cross-Border DG Permit)", status: "approved", docNo: newJob.customsPermitNo },
         { name: "ใบขนสินค้าขาออก กศก.120 พร้อมชำระภาษี", status: "approved", docNo: newJob.customsDeclarationNo },

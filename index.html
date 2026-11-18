@@ -378,9 +378,14 @@
         <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-140px)]">
           <!-- Left Vehicle List -->
           <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col h-full">
-            <div class="flex items-center justify-between mb-3">
-              <h3 class="text-sm font-bold text-slate-800">รายชื่อรถ (<span data-kpi="total-vehicles">14</span> คัน)</h3>
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="text-sm font-bold text-slate-800">รายชื่อรถ (<span id="gps-vehicles-count-label">14</span> คัน)</h3>
               <span class="text-xs text-slate-400">Live GPS</span>
+            </div>
+            <!-- Search Vehicle Input -->
+            <div class="relative mb-3">
+              <input type="text" id="gps-vehicle-search" oninput="App.filterGpsSearch(this.value)" placeholder="ค้นหาทะเบียน, รุ่น หรือคนขับ..." class="w-full px-3 py-1.5 pl-8 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono">
+              <svg class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
             </div>
             <div class="flex-1 overflow-y-auto pr-1" id="gps-vehicle-list"></div>
           </div>
@@ -388,11 +393,11 @@
           <!-- Right Fullscreen Map -->
           <div class="lg:col-span-3 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col h-full">
             <div class="flex items-center justify-between mb-2">
-              <div class="flex items-center gap-3">
+              <div class="flex items-center gap-2">
                 <span class="text-xs font-bold text-slate-700">ตัวกรอง:</span>
-                <button onclick="App.mapManagers.gps.renderVehicles('all')" class="px-2.5 py-1 text-xs font-bold bg-slate-100 hover:bg-slate-200 rounded-lg">ทั้งหมด (<span data-kpi="total-vehicles">14</span>)</button>
-                <button onclick="App.mapManagers.gps.renderVehicles('running')" class="px-2.5 py-1 text-xs font-bold bg-emerald-100 text-emerald-800 hover:bg-emerald-200 rounded-lg">กำลังวิ่ง</button>
-                <button onclick="App.mapManagers.gps.renderVehicles('resting')" class="px-2.5 py-1 text-xs font-bold bg-amber-100 text-amber-800 hover:bg-amber-200 rounded-lg">จอดพัก</button>
+                <button id="gps-btn-filter-all" onclick="App.filterGpsStatus('all')" class="px-2.5 py-1 text-xs font-bold rounded-lg transition bg-blue-600 text-white shadow-sm">ทั้งหมด (14)</button>
+                <button id="gps-btn-filter-running" onclick="App.filterGpsStatus('running')" class="px-2.5 py-1 text-xs font-bold rounded-lg transition bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-800">กำลังวิ่ง</button>
+                <button id="gps-btn-filter-resting" onclick="App.filterGpsStatus('resting')" class="px-2.5 py-1 text-xs font-bold rounded-lg transition bg-slate-100 text-slate-700 hover:bg-amber-50 hover:text-amber-800">จอดพัก</button>
               </div>
               <div class="text-xs text-slate-400">แผนที่ OpenStreetMap / Real-time Marker Update</div>
             </div>
@@ -534,17 +539,17 @@
         <!-- Completed Jobs Report Table -->
         <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
           <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
+            <table class="w-full text-left border-collapse min-w-[800px]">
               <thead>
                 <tr class="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
-                  <th class="py-3 px-4">เลขงาน</th>
-                  <th class="py-3 px-4">วันที่ / ปิดงาน</th>
-                  <th class="py-3 px-4">ลูกค้า</th>
-                  <th class="py-3 px-4">เส้นทาง (รับ &rarr; ส่ง)</th>
-                  <th class="py-3 px-4">สินค้า / ปริมาณ</th>
-                  <th class="py-3 px-4 text-right">ระยะทาง</th>
-                  <th class="py-3 px-4">รถ / คนขับ</th>
-                  <th class="py-3 px-4 text-right">รายละเอียด</th>
+                  <th class="py-2.5 px-3">เลขงาน</th>
+                  <th class="py-2.5 px-3">วันที่ / ปิดงาน</th>
+                  <th class="py-2.5 px-3">ลูกค้า</th>
+                  <th class="py-2.5 px-3">เส้นทาง (รับ &rarr; ส่ง)</th>
+                  <th class="py-2.5 px-3">สินค้า / ปริมาณ</th>
+                  <th class="py-2.5 px-3 text-right">ระยะทาง</th>
+                  <th class="py-2.5 px-3">รถ / คนขับ</th>
+                  <th class="py-2.5 px-3 text-right">รายละเอียด</th>
                 </tr>
               </thead>
               <tbody id="history-jobs-table-body"></tbody>
