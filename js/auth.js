@@ -6,6 +6,14 @@
 
 const Auth = {
   SESSION_KEY: "NEXTROUTE_AUTH_USER_V1",
+  LOCKOUT_KEY: "NEXTROUTE_AUTH_LOCK_UNTIL_V1",
+  FAIL_COUNT_KEY: "NEXTROUTE_AUTH_FAIL_COUNT_V1",
+  REMEMBER_KEY: "NEXTROUTE_AUTH_REMEMBERED_USER_V1",
+  
+  MAX_ATTEMPTS: 5,
+  LOCKOUT_DURATION_MS: 60 * 1000, // 60 seconds lockout
+  SESSION_MAX_AGE_MS: 24 * 60 * 60 * 1000, // 24 hours validity
+  DEFAULT_PASSWORD: "123456", // Current test environment password for both Admin & Drivers
 
   // Master accounts list for system roles and all 14 NWT drivers
   ACCOUNTS: [
@@ -241,9 +249,90 @@ const Auth = {
   getCurrentUser() {
     try {
       const raw = localStorage.getItem(this.SESSION_KEY);
-      return raw ? JSON.parse(raw) : null;
+      if (!raw) return null;
+      const user = JSON.parse(raw);
+      
+      // Enforce session expiration (e.g. 24 hours)
+      if (user.loginAt && (Date.now() - user.loginAt > this.SESSION_MAX_AGE_MS)) {
+        this.logout();
+        return null;
+      }
+      return user;
     } catch (e) {
       return null;
+    }
+  },
+
+  // -------------------------------------------------------------
+  // Brute-force & Security Lockout Controls
+  // -------------------------------------------------------------
+  isLockedOut() {
+    try {
+      const lockUntil = parseInt(localStorage.getItem(this.LOCKOUT_KEY) || "0", 10);
+      return lockUntil > Date.now();
+    } catch (e) {
+      return false;
+    }
+  },
+
+  getLockoutRemainingSeconds() {
+    try {
+      const lockUntil = parseInt(localStorage.getItem(this.LOCKOUT_KEY) || "0", 10);
+      const remaining = Math.ceil((lockUntil - Date.now()) / 1000);
+      return remaining > 0 ? remaining : 0;
+    } catch (e) {
+      return 0;
+    }
+  },
+
+  recordFailedAttempt() {
+    try {
+      let fails = parseInt(localStorage.getItem(this.FAIL_COUNT_KEY) || "0", 10) + 1;
+      localStorage.setItem(this.FAIL_COUNT_KEY, fails.toString());
+      if (fails >= this.MAX_ATTEMPTS) {
+        const lockUntil = Date.now() + this.LOCKOUT_DURATION_MS;
+        localStorage.setItem(this.LOCKOUT_KEY, lockUntil.toString());
+      }
+    } catch (e) {
+      // ignore
+    }
+  },
+
+  getRemainingAttempts() {
+    try {
+      const fails = parseInt(localStorage.getItem(this.FAIL_COUNT_KEY) || "0", 10);
+      return Math.max(0, this.MAX_ATTEMPTS - fails);
+    } catch (e) {
+      return this.MAX_ATTEMPTS;
+    }
+  },
+
+  resetLockout() {
+    try {
+      localStorage.removeItem(this.FAIL_COUNT_KEY);
+      localStorage.removeItem(this.LOCKOUT_KEY);
+    } catch (e) {
+      // ignore
+    }
+  },
+
+  getRememberedUser() {
+    try {
+      return localStorage.getItem(this.REMEMBER_KEY) || "";
+    } catch (e) {
+      return "";
+    }
+  },
+
+  setRememberedUser(username, remember = true) {
+    try {
+      if (remember && username) {
+        localStorage.setItem(this.REMEMBER_KEY, username.trim());
+      } else {
+        localStorage.removeItem(this.REMEMBER_KEY);
+      }
+    } catch (e) {
+      // ignore
     }
   },
 
@@ -253,11 +342,29 @@ const Auth = {
    * - driverId (e.g. 'D-01', 'D-14', 'd-7', '07', '7')
    * - license plate (e.g. '74-0549', '73-8910')
    * - driver name (e.g. 'สุเทพ', 'จิรพัฒน์', 'น้อม', 'suthep')
+   * With REAL password verification & Brute-force rate limiting
    */
-  login(username, password) {
+  login(username, password, rememberMe = false) {
+    // 1. Check if system is currently locked out
+    if (this.isLockedOut()) {
+      const secs = this.getLockoutRemainingSeconds();
+      return {
+        success: false,
+        locked: true,
+        lockoutSeconds: secs,
+        message: `ระบบระงับการเข้าสู่ระบบชั่วคราวเนื่องจากพยายามล็อกอินผิดเกินกำหนด กรุณารออีก ${secs} วินาที`
+      };
+    }
+
     const cleanUser = (username || "").trim();
     if (!cleanUser) {
       return { success: false, message: "กรุณาระบุชื่อผู้ใช้ หรือรหัสคนขับ" };
+    }
+
+    // 2. Validate password presence
+    const cleanPass = (password || "").trim();
+    if (!cleanPass) {
+      return { success: false, message: "กรุณาระบุรหัสผ่านเข้าใช้งาน" };
     }
 
     const uLower = cleanUser.toLowerCase();
@@ -302,26 +409,60 @@ const Auth = {
       }
     }
 
+    // Account not found
     if (!matched) {
+      this.recordFailedAttempt();
+      if (this.isLockedOut()) {
+        const secs = this.getLockoutRemainingSeconds();
+        return {
+          success: false,
+          locked: true,
+          lockoutSeconds: secs,
+          message: `ระงับการเข้าสู่ระบบชั่วคราว: กรอกข้อมูลไม่ถูกต้องเกิน ${this.MAX_ATTEMPTS} ครั้ง กรุณารอ ${secs} วินาที`
+        };
+      }
+      const rem = this.getRemainingAttempts();
       return {
         success: false,
-        message: `ไม่พบชื่อผู้ใช้งานหรือรหัส "${cleanUser}" (ลองใช้: admin, NEXTROUTE, หรือคนขับ D-01 ถึง D-14)`
+        message: `ไม่พบบัญชีผู้ใช้งาน "${cleanUser}" กรุณาตรวจสอบรหัสคนขับหรือชื่อผู้ใช้ (เหลือโอกาสอีก ${rem} ครั้ง)`
       };
     }
 
-    localStorage.setItem(this.SESSION_KEY, JSON.stringify(matched));
-    return { success: true, user: matched };
-  },
-
-  quickLogin(accountKey) {
-    const res = this.login(accountKey, "123456");
-    if (res.success) {
-      window.location.href = res.user.redirect;
-    } else {
-      const matched = this.ACCOUNTS[0];
-      localStorage.setItem(this.SESSION_KEY, JSON.stringify(matched));
-      window.location.href = matched.redirect;
+    // 3. Real Password Verification (Test phase password = 123456)
+    const expectedPassword = matched.password || this.DEFAULT_PASSWORD;
+    if (cleanPass !== expectedPassword) {
+      this.recordFailedAttempt();
+      if (this.isLockedOut()) {
+        const secs = this.getLockoutRemainingSeconds();
+        return {
+          success: false,
+          locked: true,
+          lockoutSeconds: secs,
+          message: `ระงับการเข้าสู่ระบบชั่วคราว: กรอกรหัสผ่านผิดเกิน ${this.MAX_ATTEMPTS} ครั้ง กรุณารออีก ${secs} วินาที`
+        };
+      }
+      const rem = this.getRemainingAttempts();
+      return {
+        success: false,
+        message: `รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง (เหลือโอกาสอีก ${rem} ครั้ง)`
+      };
     }
+
+    // 4. Authentication Success! Reset lockout counters
+    this.resetLockout();
+
+    // Remember me preference
+    this.setRememberedUser(cleanUser, rememberMe);
+
+    // Build secure session object
+    const sessionUser = {
+      ...matched,
+      loginAt: Date.now(),
+      sessionToken: "NRL-" + Math.random().toString(36).substring(2, 9).toUpperCase() + "-" + Date.now().toString(36).toUpperCase()
+    };
+
+    localStorage.setItem(this.SESSION_KEY, JSON.stringify(sessionUser));
+    return { success: true, user: sessionUser };
   },
 
   logout() {
