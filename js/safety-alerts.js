@@ -12,17 +12,57 @@ class SafetyAlertsService {
     this.alerts = [];
     this.dismissedAlerts = new Set();
     this.idleTimers = {}; // vehicleId -> startTimestamp (epoch ms)
-    this.simulationOverrides = {
-      "V-08": { forceIdle: true }
-    };
+    this.simulationOverrides = {};
     this.soundEnabled = true;
     this.audioCtx = null;
     this.lastCriticalCount = 0;
 
-    // Pre-seed realistic idle timer for V-08 (คัน ชบ.74-0551 ที่สถานะ idle ใน NWT GPS)
-    // ให้จอดติดเครื่องยนต์มาแล้ว 72 นาที (> 1 ชม.) เพื่อเป็นตัวอย่างจริงทันที
-    const defaultIdleMs = 72 * 60 * 1000;
-    this.idleTimers["V-08"] = Date.now() - defaultIdleMs;
+    // Defined Geofence Safe Zones (พื้นที่ปลอดภัยที่ได้รับการยกเว้นการแจ้งเตือนฉุกเฉิน)
+    this.safeZones = [
+      {
+        id: "SAFE-HQ",
+        code: "NRL_HQ",
+        name: "ศูนย์ปฏิบัติการ / ลานจอดสำนักงานใหญ่ (NRL ชลบุรี)",
+        address: "99/12 หมู่ 3 ต.ดอนหัวฬ่อ อ.เมืองชลบุรี จ.ชลบุรี",
+        lat: 13.2083,
+        lng: 101.0000,
+        radiusMeters: 600,
+        description: "พื้นที่คุ้มกัน: ยานพาหนะที่จอดรองานหรือติดเครื่องยนต์ในศูนย์จะได้รับการยกเว้นการแจ้งเตือนฉุกเฉิน"
+      }
+    ];
+  }
+
+  /**
+   * ตรวจสอบว่าพิกัด GPS อยู่ในเขตพื้นที่ปลอดภัย (Safe Zone) หรือไม่
+   */
+  checkSafeZone(lat, lng) {
+    if (typeof lat !== "number" || typeof lng !== "number") return null;
+    for (const zone of this.safeZones) {
+      const distM = this.calcDistanceMeters(lat, lng, zone.lat, zone.lng);
+      if (distM <= zone.radiusMeters) {
+        return {
+          isInside: true,
+          zone: zone,
+          distMeters: Math.round(distM)
+        };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * คำนวณระยะทางระหว่างพิกัด 2 จุดเป็นเมตร (Haversine Formula)
+   */
+  calcDistanceMeters(lat1, lon1, lat2, lon2) {
+    const R = 6371000; // รัศมีโลกเป็นเมตร
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
   }
 
   init() {
@@ -105,39 +145,54 @@ class SafetyAlertsService {
       const driver = driverMap[v.driverId] || { name: v.driverName, phone: "081-987-1001" };
       const driverPhone = driver.phone || "081-987-1001";
 
+      const curLat = this.simulationOverrides[v.id]?.lat ?? v.lat;
+      const curLng = this.simulationOverrides[v.id]?.lng ?? v.lng;
+      const curAddr = this.simulationOverrides[v.id]?.address ?? v.address;
+
+      // ตรวจสอบว่าพิกัดรถอยู่ในเขตพื้นที่ปลอดภัย (Safe Zone เช่น สำนักงานใหญ่ NRL) หรือไม่
+      const safeCheck = this.checkSafeZone(curLat, curLng);
+      const isInsideSafeZone = Boolean(safeCheck && safeCheck.isInside);
+
       // ---------------------------------------------------------------
-      // Rule 2 & 3: Excessive Idling (จอดติดเครื่องยนต์นาน)
+      // Rule 2: Excessive Idling (จอดติดเครื่องยนต์นานเกิน 1 ชั่วโมง)
       // ---------------------------------------------------------------
       const isIdle = (v.status === "idle") || (v.speed === 0 && this.simulationOverrides[v.id]?.forceIdle);
 
       if (isIdle) {
-        if (!this.idleTimers[v.id]) {
-          this.idleTimers[v.id] = now;
-        }
+        if (isInsideSafeZone) {
+          // 🛡️ รถอยู่ในเขต Geofence Safe Zone (ลานจอดสำนักงานใหญ่/ศูนย์ชลบุรี)
+          // ยกเว้นการแจ้งเตือนฉุกเฉินวิกฤต เพื่อไม่ให้รบกวนกรณีจอดรองานหรือช่างตรวจเช็คเครื่องยนต์
+          delete this.idleTimers[v.id];
+        } else {
+          // ⚠️ รถจอดติดเครื่องยนต์ "นอกเขตปลอดภัย" (ข้างทางหลวง, บนถนน, ทางเปลี่ยว)
+          if (!this.idleTimers[v.id]) {
+            this.idleTimers[v.id] = now;
+          }
 
-        const idleSince = this.idleTimers[v.id];
-        const idleMins = Math.floor((now - idleSince) / (60 * 1000));
+          const idleSince = this.idleTimers[v.id];
+          const idleMins = Math.floor((now - idleSince) / (60 * 1000));
 
-        // Rule 2: CRITICAL Idle > 60 Minutes (ความเสี่ยงอุบัติเหตุร้ายแรง / คนขับหมดสติ)
-        if (idleMins >= 60) {
-          newAlerts.push({
-            id: `idle_crit_${v.id}`,
-            type: "idle_critical",
-            level: "critical", // 🔴
-            badgeText: "🔴 จอดติดเครื่องวิกฤต (> 1 ชม.)",
-            title: `จอดติดเครื่องยนต์นานผิดปกติ ${idleMins} นาที`,
-            desc: `รถจอดติดเครื่องนิ่งสนิทเกิน 1 ชั่วโมงที่ "${v.address || "ไม่ระบุพิกัด"}" อาจเกิดเหตุฉุกเฉิน คนขับหมดสติ หรืออุบัติเหตุร้ายแรง ติดต่อคนขับทันที`,
-            vehicleId: v.id,
-            plate: v.plate,
-            driverName: v.driverName || driver.name,
-            phone: driverPhone,
-            address: v.address,
-            lat: v.lat,
-            lng: v.lng,
-            durationMins: idleMins,
-            timestamp: new Date(idleSince).toISOString(),
-            isCriticalIdle: true
-          });
+          // Rule 2: CRITICAL Idle > 60 Minutes (ความเสี่ยงอุบัติเหตุร้ายแรง / คนขับหมดสติ)
+          if (idleMins >= 60) {
+            newAlerts.push({
+              id: `idle_crit_${v.id}`,
+              type: "idle_critical",
+              level: "critical", // 🔴
+              badgeText: "🔴 จอดติดเครื่องวิกฤต (> 1 ชม.)",
+              title: `จอดติดเครื่องยนต์นานผิดปกติ ${idleMins} นาที (นอกศูนย์)`,
+              desc: `รถจอดติดเครื่องนิ่งสนิทเกิน 1 ชั่วโมงนอกเขตปลอดภัยที่ "${curAddr || "ไม่ระบุพิกัด"}" อาจเกิดเหตุฉุกเฉิน คนขับหมดสติ หรืออุบัติเหตุร้ายแรง ติดต่อคนขับทันที`,
+              vehicleId: v.id,
+              plate: v.plate,
+              driverName: v.driverName || driver.name,
+              phone: driverPhone,
+              address: curAddr,
+              lat: curLat,
+              lng: curLng,
+              durationMins: idleMins,
+              timestamp: new Date(idleSince).toISOString(),
+              isCriticalIdle: true
+            });
+          }
         }
       } else {
         // Not idle anymore, reset idle timer unless simulated
@@ -299,16 +354,30 @@ class SafetyAlertsService {
 
           <!-- Simulator Quick Test Bar -->
           <div class="flex flex-wrap items-center gap-1.5">
-            <button type="button" onclick="window.SafetyAlerts.simulateIdleEmergency('V-08', 75)" class="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 rounded-xl text-[11px] font-bold transition flex items-center gap-1" title="จำลองรถ V-08 จอดติดเครื่องยนต์ 75 นาที">
-              <span>⚡ จำลองจอดติดเครื่อง 75 น. (V-08)</span>
+            <button type="button" onclick="window.SafetyAlerts.simulateIdleEmergency('V-07', 75)" class="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 rounded-xl text-[11px] font-bold transition flex items-center gap-1 cursor-pointer" title="จำลองรถจอดติดเครื่องยนต์นอกศูนย์ 75 นาที">
+              <span>⚡ จำลองจอดติดเครื่อง 75 น. (นอกศูนย์)</span>
             </button>
-            <button type="button" onclick="window.SafetyAlerts.simulateDriverSos()" class="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-[11px] font-bold transition flex items-center gap-1" title="จำลองคนขับกดยิง SOS แจ้งเหตุ">
+            <button type="button" onclick="window.SafetyAlerts.simulateDriverSos()" class="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-[11px] font-bold transition flex items-center gap-1 cursor-pointer" title="จำลองคนขับกดยิง SOS แจ้งเหตุ">
               <span>🚨 จำลอง SOS</span>
             </button>
-            <button type="button" onclick="window.SafetyAlerts.resetSimulation()" class="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[11px] font-bold transition" title="ล้างการจำลองกลับสู่ข้อมูลจริง">
+            <button type="button" onclick="window.SafetyAlerts.resetSimulation()" class="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[11px] font-bold transition cursor-pointer" title="ล้างการจำลองกลับสู่ข้อมูลจริง">
               <span>🔄 รีเซ็ต</span>
             </button>
           </div>
+        </div>
+
+        <!-- Geofence Safe Zone Status Indicator -->
+        <div class="p-3 bg-emerald-50/70 border border-emerald-200/80 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+            <div>
+              <span class="font-bold text-emerald-950">🛡️ ระบบ Geofence Safe Zone (เขตปลอดภัย):</span>
+              <span class="text-emerald-800 ml-1">สำนักงานใหญ่ NRL ชลบุรี (รัศมีคุ้มกัน 600 ม.)</span>
+            </div>
+          </div>
+          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white text-emerald-800 border border-emerald-300 shadow-2xs whitespace-nowrap">
+            ✓ คุ้มกันอัตโนมัติ: ยกเว้นการแจ้งเตือนจอดติดเครื่องสำหรับรถในศูนย์
+          </span>
         </div>
 
         <!-- 3 KPI Summary Counters for Critical Emergencies -->
@@ -469,18 +538,21 @@ class SafetyAlertsService {
   // -------------------------------------------------------------------
   // Simulator Controls (สำหรับการทดสอบและสาธิต)
   // -------------------------------------------------------------------
-  simulateIdleEmergency(vehicleId = "V-08", minutes = 75) {
+  simulateIdleEmergency(vehicleId = "V-07", minutes = 75) {
     this.dismissedAlerts.delete(`idle_crit_${vehicleId}`);
-    this.dismissedAlerts.delete(`idle_warn_${vehicleId}`);
     
+    // จำลองพิกัดรถจอดติดเครื่องยนต์อยู่นอกศูนย์ (บนทางหลวงสาย 344 บ้านบึง นอกเขต Geofence Safe Zone)
     this.simulationOverrides[vehicleId] = {
-      forceIdle: true
+      forceIdle: true,
+      lat: 13.14125,
+      lng: 101.16842,
+      address: "ทางหลวงสาย 344 กม.42 ต.หนองไผ่แก้ว อ.บ้านบึง (นอกเขตปลอดภัยสำนักงานใหญ่)"
     };
     this.idleTimers[vehicleId] = Date.now() - (minutes * 60 * 1000);
     this.evaluate();
 
     if (window.App && window.App.showToast) {
-      window.App.showToast(`🧪 จำลองสถานการณ์: รถคัน ${vehicleId} จอดติดเครื่องยนต์นาน ${minutes} นาที (> 1 ชม.) แล้ว`, "error");
+      window.App.showToast(`🧪 จำลองสถานการณ์: รถคัน ${vehicleId} จอดติดเครื่องยนต์นอกศูนย์นาน ${minutes} นาที (> 1 ชม.) แล้ว`, "error");
     }
   }
 
@@ -507,15 +579,13 @@ class SafetyAlertsService {
 
   resetSimulation() {
     this.simulationOverrides = {};
+    this.idleTimers = {};
     localStorage.removeItem("NEXTROUTE_ACTIVE_SOS");
     this.dismissedAlerts.clear();
-
-    // Reset V-08 idle timer back to 72 mins default
-    this.idleTimers["V-08"] = Date.now() - (72 * 60 * 1000);
     this.evaluate();
 
     if (window.App && window.App.showToast) {
-      window.App.showToast("🔄 รีเซ็ตการแจ้งเตือนกลับสู่สถานะมาตรฐานเรียบร้อย", "success");
+      window.App.showToast("🔄 รีเซ็ตการแจ้งเตือนกลับสู่ข้อมูลจริง (สถานะปลอดภัยทั้งหมด)", "success");
     }
   }
 

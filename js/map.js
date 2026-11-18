@@ -108,7 +108,40 @@ class MapManager {
     if (!this.map || !window.store) return;
     const locations = window.store.getLocations();
 
+    if (this.safeZoneLayers) {
+      this.safeZoneLayers.forEach(l => this.map.removeLayer(l));
+      this.safeZoneLayers = [];
+    } else {
+      this.safeZoneLayers = [];
+    }
+
     locations.forEach(loc => {
+      // Draw Geofence Safe Zone circle for Depot / HQ
+      if (loc.type === "depot" || loc.code === "NRL_HQ" || loc.id === "LOC-003") {
+        const safeCircle = L.circle([loc.lat, loc.lng], {
+          radius: 600, // 600 meters Safe Zone
+          color: "#10b981",
+          fillColor: "#10b981",
+          fillOpacity: 0.12,
+          weight: 2,
+          dashArray: "6, 6"
+        }).addTo(this.map);
+
+        safeCircle.bindPopup(`
+          <div class="p-2 min-w-[220px] text-xs">
+            <div class="flex items-center gap-1.5 font-bold text-emerald-800">
+              <span>🛡️ เขตปลอดภัย (Geofence Safe Zone)</span>
+            </div>
+            <div class="font-bold text-slate-900 text-sm mt-1">${loc.name}</div>
+            <div class="text-[11px] text-slate-500 mt-0.5">รัศมีคุ้มกัน: 600 เมตร</div>
+            <div class="mt-2 p-1.5 bg-emerald-50 rounded-lg border border-emerald-200 text-[10px] text-emerald-800 font-medium leading-relaxed">
+              ✓ ยานพาหนะที่จอดในเขตนี้จะได้รับการยกเว้นการแจ้งเตือนฉุกเฉิน สำหรับจอดรองานหรือตรวจเช็คเครื่องยนต์
+            </div>
+          </div>
+        `);
+        this.safeZoneLayers.push(safeCircle);
+      }
+
       const marker = L.marker([loc.lat, loc.lng], {
         icon: this.createLocationIcon(loc.type)
       }).addTo(this.map);
